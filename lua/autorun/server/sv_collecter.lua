@@ -11,35 +11,57 @@ function Initialize() -- creates a data_collector directory on server start if t
 end
 
 function ServerStart() -- saves server starting information
-  action = '[ServerStart]'
-  time = CurTime()
-  string = action .. ' time: ' .. time .. '\n'
+  action = 'server_start'
+  action_table = {
+    ['action'] = action,
+    ['time'] = os.date()
+  }
+  action_json = util.TableToJSON(action_table)
+  string = action_json .. '\n'
   file.Append(FILE_PATH, string)
 end
 
-function PlayerJoin( ply ) -- saves player join information
-  action = '[PlayerJoin]'
-  player = ply:UniqueID()
-  time = CurTime()
-  string = action .. ' player: ' .. player .. ', time: ' .. time .. '\n'
+function PlayerJoin(ply) -- saves player join information
+  action = 'player_join'
+  user_info = {
+    ['steam_id'] = ply:SteamID(),
+    ['name'] =  ply:GetName(),
+    ['bot'] = ply:IsBot()
+  }
+  action_table = {
+    ['action'] = action,
+    ['user'] = user_info,
+    ['time'] = os.date()
+  }
+  action_json = util.TableToJSON(action_table)
+  string = action_json .. '\n'
   file.Append(FILE_PATH, string)
-  -- [ TODO ] Send User Infos with join so webapp can make profile
 end
 
-gameevent.Listen( "player_disconnect" )
-hook.Add( "player_disconnect", "player_disconnect_example", function( data )
-	local name = data.name			// Same as Player:Nick()
-	local steamid = data.networkid		// Same as Player:SteamID()
-	local id = data.userid			// Same as Player:UserID()
-	local bot = data.bot			// Same as Player:IsBot()
-	local reason = data.reason		// Text reason for disconnected such as "Kicked by console!", "Timed out!", etc...
-
-  file.Append(FILE_PATH, 'Test')
+gameevent.Listen('player_disconnect')
+hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
+  action = 'player_disconnect'
+  user = {
+    ['steam_id'] = data.networkid,
+    ['name'] =  data.name,
+    ['reason'] =  data.reason,
+    ['user_id'] =  data.userid,
+    ['bot'] = data.bot
+  }
+  action_table = {
+    ['action'] = action,
+    ['user'] =  user,
+    ['time'] = os.date()
+  }
+  action_json = util.TableToJSON(action_table)
+  string = action_json .. '\n'
+  file.Append(FILE_PATH, string)
 end )
 
--- //////   [ events ]   //////
-
 -- //////   [ hooks ]   //////
-hook.Add("Initialize", "InitializeFile", Initialize)
-hook.Add("Initialize", "ServerStart", ServerStart)
-hook.Add("PlayerInitialSpawn", "PlayerJoin", PlayerJoin)
+hook.Add('Initialize', 'InitializeFile', Initialize)
+hook.Add('Initialize', 'ServerStart', ServerStart)
+hook.Add('PlayerInitialSpawn', 'PlayerJoin', PlayerJoin)
+
+-- //////   [helpers]   //////
+
