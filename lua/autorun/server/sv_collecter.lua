@@ -108,6 +108,23 @@ function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
   add_table_to_file(action_table)
 end
 
+function FoundDNA(ply, dna_owner, ent)
+  user = extract_player_table(ply)
+  print(dna_owner)
+  -- [TODO]
+end
+
+function UsedHealtStation(ply, ent_station, healed)
+  action = 'used_health_station'
+  user_info = extract_player_table(ply)
+  action_table = {
+    ['action'] = action,
+    ['user'] = user_info,
+    ['healed'] = healed
+  }
+  add_table_to_file(action_table)
+end
+
 gameevent.Listen('player_disconnect')
 hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
   action = 'player_disconnect'
@@ -168,6 +185,8 @@ hook.Add('TTTBeginRound', 'round_begin', RoundBegin)
 hook.Add('TTTEndRound', 'round_end', RoundEnd)
 hook.Add('TTTOrderedEquipment', 'equipment_bought', EquipmentBought)
 hook.Add('TTTCanSearchCorpse', 'corpse_searched', CorpseSearch)
+hook.Add('TTTFoundDNA', 'found_dna', FoundDNA)
+hook.Add('TTTPlayerUsedHealthStation ', 'used_helth_station', UsedHealtStation)
 
 -- //////   [helpers]   //////
 
