@@ -59,7 +59,8 @@ function RoundBegin()
   action_table = {
     ['action'] = action,
     ['time'] = os.time(),
-    ['roles'] = user_roles
+    ['roles'] = user_roles,
+    ['map'] = game.GetMap()
   }
   add_table_to_file(action_table)
 end
