@@ -65,12 +65,18 @@ function RoundBegin()
 end
 
 function RoundEnd(result)
-  print(result)
   action = 'round_end'
+  if result == WIN_TRAITOR then
+    win_reason = 'win_traitor'
+  elseif WIN_INNOCENT then
+    win_reason = 'win_innocent'
+  elseif WIN_TIMELIMIT then
+    win_reason = 'win_timelimit'
+  end
   action_table = {
     ['action'] = action,
     ['time'] = os.time(),
-    ['result'] = result
+    ['result'] = win_reason
   }
   add_table_to_file(action_table)
 end
@@ -88,11 +94,12 @@ function EquipmentBought(ply, equipment, is_item)
 end
 
 function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
+  action = 'corpse_searched'
   user_info = extract_player_table(ply)
-  -- corpse_info [TODO]
   action_table = {
+    ['action'] = action,
     ['user'] = user,
-    -- ['corpse'] = corpse_info,
+    ['corpse'] = corpse_info,
     ['is_covert'] = is_covert,
     ['is_long_range'] = is_long_range,
     ['was_traitor'] = was_traitor
@@ -159,7 +166,7 @@ hook.Add('WeaponEquip', 'WeaponEquipExample', WeaponPickedUp)
 hook.Add('TTTBeginRound', 'round_begin', RoundBegin)
 hook.Add('TTTEndRound', 'round_end', RoundEnd)
 hook.Add('TTTOrderedEquipment', 'equipment_bought', EquipmentBought)
-hook.Add('TTTCanSearchCorpse ', 'corpse_searched', CorpseSearch)
+hook.Add('TTTCanSearchCorpse', 'corpse_searched', CorpseSearch)
 
 -- //////   [helpers]   //////
 
