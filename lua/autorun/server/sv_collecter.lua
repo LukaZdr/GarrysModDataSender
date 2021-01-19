@@ -16,9 +16,7 @@ function ServerStart() -- saves server starting information
     ['action'] = action,
     ['time'] = os.date()
   }
-  action_json = util.TableToJSON(action_table)
-  string = action_json .. '\n'
-  file.Append(FILE_PATH, string)
+  add_table_to_file(action_table)
 end
 
 function PlayerJoin(ply) -- saves player join information
@@ -26,16 +24,36 @@ function PlayerJoin(ply) -- saves player join information
   user_info = {
     ['steam_id'] = ply:SteamID(),
     ['name'] =  ply:GetName(),
-    ['bot'] = ply:IsBot()
+    ['bot'] = ply:IsBot(),
+    ['user_id'] = ply:UserID()
   }
   action_table = {
     ['action'] = action,
     ['user'] = user_info,
     ['time'] = os.date()
   }
-  action_json = util.TableToJSON(action_table)
-  string = action_json .. '\n'
-  file.Append(FILE_PATH, string)
+  add_table_to_file(action_table)
+end
+
+function WeaponPickedUp(weapon, ply)
+  action = 'weapon_pickup'
+  user_info = {
+    ['steam_id'] = ply:SteamID(),
+    ['name'] =  ply:GetName(),
+    ['bot'] = ply:IsBot(),
+    ['user_id'] = ply:UserID()
+  }
+  weapon_info = {
+    ['name'] = weapon:GetClass(),
+    ['index'] = weapon:EntIndex()
+  }
+  action_table = {
+    ['action'] = action,
+    ['user'] = user_info,
+    ['weapon'] = weapon_info,
+    ['time'] = os.date()
+  }
+  add_table_to_file(action_table)
 end
 
 gameevent.Listen('player_disconnect')
@@ -53,15 +71,53 @@ hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
     ['user'] =  user,
     ['time'] = os.date()
   }
-  action_json = util.TableToJSON(action_table)
-  string = action_json .. '\n'
-  file.Append(FILE_PATH, string)
+  add_table_to_file(action_table)
+end )
+
+gameevent.Listen( "player_hurt" )
+hook.Add( "player_hurt", "player_hurt", function(data)
+  action = 'player_hurt'
+  user = {
+    ['health'] = data.health,
+    ['user_id'] = data.userid, -- Same as Player:UserID()
+    ['attacker_id'] = data.attacker -- Same as Player:UserID()
+  }
+  action_table = {
+    ['action'] = action,
+    ['user'] =  user,
+    ['time'] = os.date()
+  }
+  add_table_to_file(action_table)
+end )
+
+gameevent.Listen( "entity_killed" )
+hook.Add( "entity_killed", "entity_killed_example", function(data)
+  action = 'player_dead'
+  user = {
+    ['weapon_index'] = data.entindex_inflictor,
+    ['attacker_index'] = data.entindex_attacker,
+    ['damagebits'] = data.damagebits,
+    ['victim_index'] = data.entindex_killed
+  }
+  action_table = {
+    ['action'] = action,
+    ['user'] =  user,
+    ['time'] = os.date()
+  }
+  add_table_to_file(action_table)
 end )
 
 -- //////   [ hooks ]   //////
 hook.Add('Initialize', 'InitializeFile', Initialize)
 hook.Add('Initialize', 'ServerStart', ServerStart)
 hook.Add('PlayerInitialSpawn', 'PlayerJoin', PlayerJoin)
+hook.Add( "WeaponEquip", "WeaponEquipExample", WeaponPickedUp)
 
 -- //////   [helpers]   //////
+
+function add_table_to_file(table)
+  json = util.TableToJSON(table)
+  string = json .. '\n'
+  file.Append(FILE_PATH, string)
+end
 
