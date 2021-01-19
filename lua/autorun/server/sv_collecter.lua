@@ -21,12 +21,7 @@ end
 
 function PlayerJoin(ply) -- saves player join information
   action = 'player_join'
-  user_info = {
-    ['steam_id'] = ply:SteamID(),
-    ['name'] =  ply:GetName(),
-    ['bot'] = ply:IsBot(),
-    ['user_id'] = ply:UserID()
-  }
+  user_info = extract_player_table(ply)
   action_table = {
     ['action'] = action,
     ['user'] = user_info,
@@ -37,21 +32,58 @@ end
 
 function WeaponPickedUp(weapon, ply)
   action = 'weapon_pickup'
-  user_info = {
-    ['steam_id'] = ply:SteamID(),
-    ['name'] =  ply:GetName(),
-    ['bot'] = ply:IsBot(),
-    ['user_id'] = ply:UserID()
-  }
-  weapon_info = {
-    ['name'] = weapon:GetClass(),
-    ['index'] = weapon:EntIndex()
-  }
+  user_info = extract_player_table(ply)
+  weapon_info = extract_equipment_table(weapon)
   action_table = {
     ['action'] = action,
     ['user'] = user_info,
     ['weapon'] = weapon_info,
     ['time'] = os.date()
+  }
+  add_table_to_file(action_table)
+end
+
+function RoundBegin()
+  action = 'round_start'
+  action_table = {
+    ['action'] = action,
+    ['time'] = os.time()
+  }
+  add_table_to_file(action_table)
+end
+
+function RoundEnd(result)
+  print(result)
+  action = 'round_end'
+  action_table = {
+    ['action'] = action,
+    ['time'] = os.time(),
+    ['result'] = result
+  }
+  add_table_to_file(action_table)
+end
+
+function EquipmentBought(ply, equipment, is_item)
+  action = 'equipment_bought'
+  user_info = extract_player_table(ply)
+  action_table = {
+    ['action'] = action,
+    ['user'] = user,
+    ['equipment'] = equipment,  -- returns class_name if weapon || returns id if equipment
+    ['it_item'] = is_item       -- returns equipment_id if eqipment || returns nil if weapon
+  }
+  add_table_to_file(action_table)
+end
+
+function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
+  user_info = extract_player_table(ply)
+  -- corpse_info [TODO]
+  action_table = {
+    ['user'] = user,
+    -- ['corpse'] = corpse_info,
+    ['is_covert'] = is_covert,
+    ['is_long_range'] = is_long_range,
+    ['was_traitor'] = was_traitor
   }
   add_table_to_file(action_table)
 end
@@ -111,7 +143,11 @@ end )
 hook.Add('Initialize', 'InitializeFile', Initialize)
 hook.Add('Initialize', 'ServerStart', ServerStart)
 hook.Add('PlayerInitialSpawn', 'PlayerJoin', PlayerJoin)
-hook.Add( "WeaponEquip", "WeaponEquipExample", WeaponPickedUp)
+hook.Add('WeaponEquip', 'WeaponEquipExample', WeaponPickedUp)
+hook.Add('TTTBeginRound', 'round_begin', RoundBegin)
+hook.Add('TTTEndRound', 'round_end', RoundEnd)
+hook.Add('TTTOrderedEquipment', 'equipment_bought', EquipmentBought)
+hook.Add('TTTCanSearchCorpse ', 'corpse_searched', CorpseSearch)
 
 -- //////   [helpers]   //////
 
@@ -121,3 +157,20 @@ function add_table_to_file(table)
   file.Append(FILE_PATH, string)
 end
 
+function extract_player_table(ply)
+  user_info = {
+    ['steam_id'] = ply:SteamID(),
+    ['name'] =  ply:GetName(),
+    ['bot'] = ply:IsBot(),
+    ['user_id'] = ply:UserID()
+  }
+  return user_info
+end
+
+function extract_equipment_table(equip)
+  equipment_info = {
+    ['name'] = equip:GetClass(),
+    ['index'] = equip:EntIndex()
+  }
+  return equipment_info
+end
