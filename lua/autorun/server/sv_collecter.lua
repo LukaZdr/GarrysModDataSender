@@ -45,23 +45,22 @@ end
 
 function RoundBegin()
   action = 'round_start'
-  action_table = {
-    ['action'] = action,
-    ['time'] = os.time()
-  }
   user_roles = {}
   for _, ply in pairs(player.GetAll()) do
     role = ply:GetRoleString()
     if role == 'traitor' then
       user_roles['traitors'] = table.ForceInsert(user_roles['traitors'], ply:SteamID())
-    elseif role == 'inocent' then
-      user_roles['inocents'] = table.ForceInsert(user_roles['inocents'], ply:SteamID())
+    elseif role == 'innocent' then
+      user_roles['innocents'] = table.ForceInsert(user_roles['innocents'], ply:SteamID())
     elseif role == 'detective' then
       user_roles['detectives'] = table.ForceInsert(user_roles['detectives'], ply:SteamID())
     end
-    print(util.TableToJSON(user_roles))
   end
-
+  action_table = {
+    ['action'] = action,
+    ['time'] = os.time(),
+    ['roles'] = user_roles
+  }
   add_table_to_file(action_table)
 end
 
