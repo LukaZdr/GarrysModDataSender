@@ -45,21 +45,19 @@ end
 
 function RoundBegin()
   action = 'round_start'
-  user_roles = {}
   for _, ply in pairs(player.GetAll()) do
-    role = ply:GetRoleString()
-    if role == 'traitor' then
-      user_roles['traitors'] = table.ForceInsert(user_roles['traitors'], ply:SteamID())
-    elseif role == 'innocent' then
-      user_roles['innocents'] = table.ForceInsert(user_roles['innocents'], ply:SteamID())
-    elseif role == 'detective' then
-      user_roles['detectives'] = table.ForceInsert(user_roles['detectives'], ply:SteamID())
-    end
+    user = {
+      ['steam_id'] = ply:SteamID(),
+      ['karma'] = ply:GetLiveKarma(),
+      ['role'] = ply:GetRoleString()
+    }
+    players = table.ForceInsert(players, user)
   end
+
   action_table = {
     ['action'] = action,
     ['time'] = os.time(),
-    ['roles'] = user_roles,
+    ['players'] = players,
     ['map'] = game.GetMap()
   }
   add_table_to_file(action_table)
