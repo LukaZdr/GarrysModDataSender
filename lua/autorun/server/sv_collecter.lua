@@ -11,8 +11,8 @@ function Initialize() -- creates a data_collector directory on server start if t
 end
 
 function ServerStart() -- saves server starting information
-  action = 'server_start'
-  action_table = {
+  local action = 'server_start'
+  local action_table = {
     ['action'] = action,
     ['time'] = os.date()
   }
@@ -20,9 +20,9 @@ function ServerStart() -- saves server starting information
 end
 
 function PlayerJoin(ply) -- saves player join information
-  action = 'player_join'
-  user_info = extract_player_table(ply)
-  action_table = {
+  local action = 'player_join'
+  local user_info = extract_player_table(ply)
+  local action_table = {
     ['action'] = action,
     ['user'] = user_info,
     ['time'] = os.date()
@@ -31,10 +31,10 @@ function PlayerJoin(ply) -- saves player join information
 end
 
 function WeaponPickedUp(weapon, ply)
-  action = 'weapon_pickup'
-  user_info = extract_player_table(ply)
-  weapon_info = extract_equipment_table(weapon)
-  action_table = {
+  local action = 'weapon_pickup'
+  local  user_info = extract_player_table(ply)
+  local weapon_info = extract_equipment_table(weapon)
+  local action_table = {
     ['action'] = action,
     ['user'] = user_info,
     ['weapon'] = weapon_info,
@@ -44,17 +44,23 @@ function WeaponPickedUp(weapon, ply)
 end
 
 function RoundBegin()
-  action = 'round_start'
+  local action = 'round_start'
+  players = {}
   for _, ply in pairs(player.GetAll()) do
-    user = {
+    if ply:Team() == TEAM_SPECTATOR then
+      role = 'spectator' -- spectator roles are also innocent thats the roason for this workaround
+    else
+      role = ply:GetRoleString()
+    end
+    local user = {
       ['steam_id'] = ply:SteamID(),
       ['karma'] = ply:GetLiveKarma(),
-      ['role'] = ply:GetRoleString()
+      ['role'] = role
     }
     players = table.ForceInsert(players, user)
   end
 
-  action_table = {
+  local action_table = {
     ['action'] = action,
     ['time'] = os.time(),
     ['players'] = players,
@@ -64,15 +70,16 @@ function RoundBegin()
 end
 
 function RoundEnd(result)
-  action = 'round_end'
+  local action = 'round_end'
+  win_reason = ''
   if result == WIN_TRAITOR then
     win_reason = 'win_traitor'
-  elseif WIN_INNOCENT then
+  elseif result == WIN_INNOCENT then
     win_reason = 'win_innocent'
-  elseif WIN_TIMELIMIT then
+  else
     win_reason = 'win_timelimit'
   end
-  action_table = {
+  local action_table = {
     ['action'] = action,
     ['time'] = os.time(),
     ['result'] = win_reason
@@ -81,9 +88,9 @@ function RoundEnd(result)
 end
 
 function EquipmentBought(ply, equipment, is_item)
-  action = 'equipment_bought'
-  user_info = extract_player_table(ply)
-  action_table = {
+  local action = 'equipment_bought'
+  local user_info = extract_player_table(ply)
+  local action_table = {
     ['action'] = action,
     ['user'] = user,
     ['equipment'] = equipment,  -- returns class_name if weapon || returns id if equipment
@@ -93,9 +100,9 @@ function EquipmentBought(ply, equipment, is_item)
 end
 
 function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
-  action = 'corpse_searched'
-  user_info = extract_player_table(ply)
-  action_table = {
+  local action = 'corpse_searched'
+  local user_info = extract_player_table(ply)
+  local action_table = {
     ['action'] = action,
     ['user'] = user,
     ['corpse'] = corpse_info,
@@ -107,33 +114,22 @@ function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
 end
 
 function FoundDNA(ply, dna_owner, ent)
-  user = extract_player_table(ply)
+  local user = extract_player_table(ply)
   print(dna_owner)
   -- [TODO]
 end
 
-function UsedHealtStation(ply, ent_station, healed)
-  action = 'used_health_station'
-  user_info = extract_player_table(ply)
-  action_table = {
-    ['action'] = action,
-    ['user'] = user_info,
-    ['healed'] = healed
-  }
-  add_table_to_file(action_table)
-end
-
 gameevent.Listen('player_disconnect')
 hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
-  action = 'player_disconnect'
-  user = {
+  local action = 'player_disconnect'
+  local user = {
     ['steam_id'] = data.networkid,
     ['name'] =  data.name,
     ['reason'] =  data.reason,
     ['user_id'] =  data.userid,
     ['bot'] = data.bot
   }
-  action_table = {
+  local action_table = {
     ['action'] = action,
     ['user'] =  user,
     ['time'] = os.date()
@@ -143,13 +139,13 @@ end )
 
 gameevent.Listen( "player_hurt" )
 hook.Add( "player_hurt", "player_hurt", function(data)
-  action = 'player_hurt'
-  user = {
+  local action = 'player_hurt'
+  local user = {
     ['health'] = data.health,
     ['user_id'] = data.userid, -- Same as Player:UserID()
     ['attacker_id'] = data.attacker -- Same as Player:UserID()
   }
-  action_table = {
+  local action_table = {
     ['action'] = action,
     ['user'] =  user,
     ['time'] = os.date()
@@ -159,14 +155,14 @@ end )
 
 gameevent.Listen( "entity_killed" )
 hook.Add( "entity_killed", "entity_killed_example", function(data)
-  action = 'player_dead'
-  user = {
+  local action = 'player_dead'
+  local user = {
     ['weapon_index'] = data.entindex_inflictor,
     ['attacker_index'] = data.entindex_attacker,
     ['damagebits'] = data.damagebits,
     ['victim_index'] = data.entindex_killed
   }
-  action_table = {
+  local action_table = {
     ['action'] = action,
     ['user'] =  user,
     ['time'] = os.date()
@@ -184,18 +180,17 @@ hook.Add('TTTEndRound', 'round_end', RoundEnd)
 hook.Add('TTTOrderedEquipment', 'equipment_bought', EquipmentBought)
 hook.Add('TTTCanSearchCorpse', 'corpse_searched', CorpseSearch)
 hook.Add('TTTFoundDNA', 'found_dna', FoundDNA)
-hook.Add('TTTPlayerUsedHealthStation ', 'used_helth_station', UsedHealtStation)
 
 -- //////   [helpers]   //////
 
 function add_table_to_file(table)
-  json = util.TableToJSON(table)
-  string = json .. '\n'
+  local json = util.TableToJSON(table)
+  local string = json .. '\n'
   file.Append(FILE_PATH, string)
 end
 
 function extract_player_table(ply)
-  user_info = {
+  local user_info = {
     ['steam_id'] = ply:SteamID(),
     ['name'] =  ply:GetName(),
     ['bot'] = ply:IsBot(),
@@ -205,7 +200,7 @@ function extract_player_table(ply)
 end
 
 function extract_equipment_table(equip)
-  equipment_info = {
+  local equipment_info = {
     ['name'] = equip:GetClass(),
     ['index'] = equip:EntIndex()
   }
