@@ -62,7 +62,7 @@ function RoundBegin()
 
   local action_table = {
     ['action'] = action,
-    ['time'] = os.time(),
+    ['time'] = os.date(),
     ['players'] = players,
     ['map'] = game.GetMap()
   }
@@ -81,7 +81,7 @@ function RoundEnd(result)
   end
   local action_table = {
     ['action'] = action,
-    ['time'] = os.time(),
+    ['time'] = os.date(),
     ['result'] = win_reason
   }
   add_table_to_file(action_table)
