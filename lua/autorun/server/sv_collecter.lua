@@ -116,7 +116,7 @@ end
 function FoundDNA(ply, dna_owner, ent)
   local user = extract_player_table(ply)
   print(dna_owner)
-  -- [TODO]
+  -- [TODO] needs second player for testing
 end
 
 gameevent.Listen('player_disconnect')
