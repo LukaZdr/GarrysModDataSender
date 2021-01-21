@@ -91,13 +91,13 @@ function EquipmentBought(ply, equipment, is_item)
   local action = 'equipment_bought'
   local user_info = extract_player_table(ply)
   local equipment_info = {
-    ['name'] = eqipment,
+    ['name'] = equipment, -- returns class_name if weapon || returns id if equipment
     ['role'] = ply:GetRoleString()
   }
   local action_table = {
     ['action'] = action,
     ['user'] = user,
-    ['equipment'] = equipment_info,  -- returns class_name if weapon || returns id if equipment
+    ['equipment'] = equipment_info,
     ['is_item'] = is_item       -- returns equipment_id if eqipment || returns nil if weapon
   }
   add_table_to_file(action_table)
