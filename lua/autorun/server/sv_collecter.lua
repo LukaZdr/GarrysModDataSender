@@ -161,9 +161,9 @@ hook.Add( "player_hurt", "player_hurt", function(data)
   add_table_to_file(action_table)
 end )
 
-hook.Add( "EntityTakeDamage", "EntityDamageExample2", function( target, dmginfo )
+hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo )
   -- test with mineturtels and stuff
-  -- check if player == targer
+  -- check if player == target
   -- determine damgage inflictor, if possible inflictor user
   -- handle case where damage inflictor != user
   -- get user.health information
@@ -223,3 +223,38 @@ function extract_equipment_table(equip)
   }
   return equipment_info
 end
+
+
+
+-- this shall provide some useful commands
+--[[
+  include("NAME DES RELATIVEN DATEIPFADES") -- einfügen von abhängigkeiten
+
+  isValid()
+
+  ply: (https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/terrortown/gamemode/player.lua)
+  (https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/terrortown/gamemode/player_ext_shd.lua)
+  :GetPos()  --
+  :GetCredits() -- credits from the player
+  :GetEquipmentItems() -- items from the player
+  :GetMaxHealth()
+  :Health()
+  :IsPlayer()  -- KA wo ich das her hab
+  :IsActive() -- Spieler noch am Leben?
+  :IsTerror() -- Im Spiel?
+  :IsSpec() -- Im Spectator
+  :IsActiveDetective()
+  :IsTraitor()
+  :IsDeadTerror()
+
+  ragdolls:
+  rag.player_ragdoll : bool -- true if player ragdoll else false
+
+
+  Eigenene Hooks Können mit:
+  hook.Run("HOOK_NAME", parameter...)
+
+  ENT:
+  :Initalize() -- Konstruktor funktionen???
+  self:Function() -- selbst aufruf
+  ]]
