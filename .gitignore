@@ -1,0 +1,4 @@
+*
+*/*
+!README.md
+!lua/autorun/server/sv_collector.lua
