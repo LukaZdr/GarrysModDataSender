@@ -1,5 +1,6 @@
 FILE_PATH = "data_collector/storage.txt"
 FOLDER_NAME = "data_collector"
+players_alive = {}
 
 function Initialize() -- creates a data_collector directory on server start if there is none
   if not file.IsDir(FOLDER_NAME, "DATA") then
@@ -43,10 +44,10 @@ function WeaponPickedUp(weapon, ply)
 end
 
 function RoundBegin()
-  print( os.time() )
+  players_alive = player.GetAll()
   local action = 'round_start'
   players = {}
-  for _, ply in pairs(player.GetAll()) do
+  for _, ply in pairs(players_alive) do
     if ply:Team() == TEAM_SPECTATOR then
       role = 'spectator' -- spectator roles are also innocent thats the wroason for this workaround
     else
@@ -160,21 +161,30 @@ hook.Add( "player_hurt", "player_hurt", function(data)
   add_table_to_file(action_table)
 end )
 
-gameevent.Listen("entity_killed")
-hook.Add( "entity_killed", "entity_killed_example", function(data)
-  local action = 'player_dead'
-  local user = {
-    ['weapon_index'] = data.entindex_inflictor,
-    ['attacker_index'] = data.entindex_attacker,
-    ['damagebits'] = data.damagebits,
-    ['victim_index'] = data.entindex_killed
-  }
-  local action_table = {
-    ['action'] = action,
-    ['user'] =  user,
-    ['time'] = os.time()
-  }
-  add_table_to_file(action_table)
+hook.Add( "EntityTakeDamage", "EntityDamageExample2", function( target, dmginfo )
+  -- test with mineturtels and stuff
+  -- check if player == targer
+  -- determine damgage inflictor, if possible inflictor user
+  -- handle case where damage inflictor != user
+  -- get user.health information
+  print(target)
+  print(dmginfo:GetInflictor())
+  print(util.WeaponFromDamage(dmginfo))
+
+
+
+  -- local user = {
+  --   ['weapon_index'] = ents.GetByIndex(data.entindex_inflictor),
+  --   ['attacker_index'] = ents.GetByIndex(data.entindex_attacker):Name(), -- data.entindex_attacker
+  --   ['damagebits'] = data.damagebits,
+  --   ['victim_index'] = ents.GetByIndex(data.entindex_killed):Name() -- data.entindex_killed
+  -- }
+  -- local action_table = {
+  --   ['action'] = action,
+  --   ['user'] =  user,
+  --   ['time'] = os.time()
+  -- }
+  -- add_table_to_file(action_table)
 end )
 
 -- //////   [ hooks ]   //////
