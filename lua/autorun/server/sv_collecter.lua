@@ -219,7 +219,7 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
       damage_info = {
         ['target'] = {
             ['steam_id'] = user_identifier(target),
-            ['health'] = target:Health(),
+            ['health_before_shot'] = target:Health(),
             ['position'] = target:GetPos()
         },
         ['inflictor'] = {
@@ -234,7 +234,7 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
       damage_info = {
         ['target'] = {
           ['steam_id'] = user_identifier(target),
-          ['health'] = target:Health()
+          ['health_before_shot'] = target:Health()
         },
         ['inflictor'] = nil, -- sollte world sein
         ['weapon'] = weapon:GetClass(),
