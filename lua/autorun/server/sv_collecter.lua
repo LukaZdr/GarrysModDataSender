@@ -14,7 +14,7 @@ function ServerStart() -- saves server starting information
   local action = 'server_start'
   local action_table = {
     ['action'] = action,
-    ['time'] = os.date()
+    ['time'] = os.time()
   }
   add_table_to_file(action_table)
 end
@@ -25,35 +25,35 @@ function PlayerJoin(ply) -- saves player join information
   local action_table = {
     ['action'] = action,
     ['user'] = user_info,
-    ['time'] = os.date()
+    ['time'] = os.time()
   }
   add_table_to_file(action_table)
 end
 
 function WeaponPickedUp(weapon, ply)
   local action = 'weapon_pickup'
-  local  user_info = extract_player_table(ply)
   local weapon_info = extract_equipment_table(weapon)
   local action_table = {
     ['action'] = action,
-    ['user'] = user_info,
+    ['user_steam_id'] = ply:SteamID(),
     ['weapon'] = weapon_info,
-    ['time'] = os.date()
+    ['time'] = os.time()
   }
   add_table_to_file(action_table)
 end
 
 function RoundBegin()
+  print( os.time() )
   local action = 'round_start'
   players = {}
   for _, ply in pairs(player.GetAll()) do
     if ply:Team() == TEAM_SPECTATOR then
-      role = 'spectator' -- spectator roles are also innocent thats the roason for this workaround
+      role = 'spectator' -- spectator roles are also innocent thats the wroason for this workaround
     else
       role = ply:GetRoleString()
     end
     local user = {
-      ['steam_id'] = ply:SteamID(),
+      ['user_steam_id'] = ply:SteamID(),
       ['karma'] = ply:GetLiveKarma(),
       ['role'] = role
     }
@@ -62,7 +62,7 @@ function RoundBegin()
 
   local action_table = {
     ['action'] = action,
-    ['time'] = os.date(),
+    ['time'] = os.time(),
     ['players'] = players,
     ['map'] = game.GetMap()
   }
@@ -81,7 +81,7 @@ function RoundEnd(result)
   end
   local action_table = {
     ['action'] = action,
-    ['time'] = os.date(),
+    ['time'] = os.time(),
     ['result'] = win_reason
   }
   add_table_to_file(action_table)
@@ -89,14 +89,14 @@ end
 
 function EquipmentBought(ply, equipment, is_item)
   local action = 'equipment_bought'
-  local user_info = extract_player_table(ply)
+  -- local user_info = extract_player_table(ply)
   local equipment_info = {
     ['name'] = equipment, -- returns class_name if weapon || returns id if equipment
     ['role'] = ply:GetRoleString()
   }
   local action_table = {
     ['action'] = action,
-    ['user'] = user,
+    ['user_steam_id'] = ply:SteamID(),
     ['equipment'] = equipment_info,
     ['is_item'] = is_item       -- returns equipment_id if eqipment || returns nil if weapon
   }
@@ -105,11 +105,10 @@ end
 
 function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
   local action = 'corpse_searched'
-  local user_info = extract_player_table(ply)
   local action_table = {
     ['action'] = action,
-    ['user'] = user,
-    ['corpse'] = corpse_info,
+    ['user_steam_id'] = ply:SteamID(),
+    ['corpse_steam_id'] = corpse.sid,
     ['is_covert'] = is_covert,
     ['is_long_range'] = is_long_range,
     ['was_traitor'] = was_traitor
@@ -118,9 +117,13 @@ function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
 end
 
 function FoundDNA(ply, dna_owner, ent)
-  local user = extract_player_table(ply)
-  print(dna_owner)
-  -- [TODO] needs second player for testing
+  local action = 'found_dna'
+  local action_table = {
+    ['action'] = action,
+    ['user_steam_id'] = ply:SteamID(),
+    ['suspect_steam_id'] = dna_owner:SteamID(),
+  }
+  add_table_to_file(action_table)
 end
 
 gameevent.Listen('player_disconnect')
@@ -136,7 +139,7 @@ hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
   local action_table = {
     ['action'] = action,
     ['user'] =  user,
-    ['time'] = os.date()
+    ['time'] = os.time()
   }
   add_table_to_file(action_table)
 end )
@@ -152,12 +155,12 @@ hook.Add( "player_hurt", "player_hurt", function(data)
   local action_table = {
     ['action'] = action,
     ['user'] =  user,
-    ['time'] = os.date()
+    ['time'] = os.time()
   }
   add_table_to_file(action_table)
 end )
 
-gameevent.Listen( "entity_killed" )
+gameevent.Listen("entity_killed")
 hook.Add( "entity_killed", "entity_killed_example", function(data)
   local action = 'player_dead'
   local user = {
@@ -169,7 +172,7 @@ hook.Add( "entity_killed", "entity_killed_example", function(data)
   local action_table = {
     ['action'] = action,
     ['user'] =  user,
-    ['time'] = os.date()
+    ['time'] = os.time()
   }
   add_table_to_file(action_table)
 end )
