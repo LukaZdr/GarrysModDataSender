@@ -1,5 +1,6 @@
 FILE_PATH = "data_collector/storage.txt"
 FOLDER_NAME = "data_collector"
+DEBUG = true
 DAMAGE_TYPES = {
   [DMG_GENERIC] = "generic",
   [DMG_CRUSH] = "crush",
@@ -35,7 +36,6 @@ DAMAGE_TYPES = {
   [DMG_SNIPER] = "sniper",
   [DMG_MISSILEDEFENSE] = "missile defense"
 }
-players_alive = {}
 
 function Initialize() -- creates a data_collector directory on server start if there is none
   if not file.IsDir(FOLDER_NAME, "DATA") then
@@ -74,7 +74,7 @@ function WeaponPickedUp(weapon, ply)
   local weapon_info = extract_equipment_table(weapon)
   local action_table = {
     ['action'] = action,
-    ['user_steam_id'] = ply:SteamID(),
+    ['user_steam_id'] = user_identifier(ply),
     ['weapon'] = weapon_info,
     ['time'] = os.time()
   }
@@ -89,7 +89,7 @@ function RoundBegin()
 
   for _, ply in ipairs(player.GetAll()) do
     local user = {
-      ['user_steam_id'] = ply:SteamID(),
+      ['user_steam_id'] = user_identifier(ply),
       ['karma'] = ply:GetLiveKarma(),
       ['credits'] = ply:GetCredits()
     }
@@ -147,7 +147,7 @@ function EquipmentBought(ply, equipment, is_item)
   }
   local action_table = {
     ['action'] = action,
-    ['user_steam_id'] = ply:SteamID(),
+    ['user_steam_id'] = user_identifier(ply),
     ['equipment'] = equipment_info,
     ['is_item'] = is_item       -- returns equipment_id if eqipment || returns nil if weapon
   }
@@ -160,7 +160,7 @@ function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
   local action = 'corpse_searched'
   local action_table = {
     ['action'] = action,
-    ['user_steam_id'] = ply:SteamID(),
+    ['user_steam_id'] = user_identifier(ply),
     ['corpse_steam_id'] = corpse.sid,
     ['is_covert'] = is_covert,
     ['is_long_range'] = is_long_range,
@@ -173,8 +173,8 @@ function FoundDNA(ply, dna_owner, ent)
   local action = 'found_dna'
   local action_table = {
     ['action'] = action,
-    ['user_steam_id'] = ply:SteamID(),
-    ['suspect_steam_id'] = dna_owner:SteamID(),
+    ['user_steam_id'] = user_identifier(ply),
+    ['suspect_steam_id'] = user_identifier(dna_owner),
   }
   add_table_to_file(action_table)
 end
@@ -209,14 +209,16 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
     if inflictor:IsPlayer() or dmginfo:GetAttacker():IsPlayer() then
       local inf_steam_id = ""
       if inflictor:IsPlayer() then
-        inf_steam_id = inflictor:SteamID()
+        inf_steam_id = user_identifier(inflictor)
       else
-        inf_steam_id = dmginfo:GetAttacker():SteamID()
+        inf_steam_id = user_identifier(dmginfo:GetAttacker())
       end
+
+      weapon = util.WeaponFromDamage(dmginfo)
 
       damage_info = {
         ['target'] = {
-            ['steam_id'] = target:SteamID(),
+            ['steam_id'] = user_identifier(target),
             ['health'] = target:Health(),
             ['position'] = target:GetPos()
         },
@@ -224,18 +226,18 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
           ['steam_id'] = inf_steam_id,
           ['position'] = inflictor:GetPos()
         },
-        ['weapon'] = util.WeaponFromDamage(dmginfo),
+        ['weapon'] = weapon:GetClass(),
         ['damage_points'] = dmginfo:GetDamage(),
         ['damage_type'] = GetDMGTypeStr(dmginfo:GetDamageType())
       }
     else
       damage_info = {
         ['target'] = {
-          ['steam_id'] = target:SteamID(),
+          ['steam_id'] = user_identifier(target),
           ['health'] = target:Health()
         },
         ['inflictor'] = nil, -- sollte world sein
-        ['weapon'] = util.WeaponFromDamage(dmginfo),
+        ['weapon'] = weapon:GetClass(),
         ['damage_points'] = dmginfo:GetDamage(),
         ['damage_type'] = GetDMGTypeStr(dmginfo:GetDamageType())
       }
@@ -275,7 +277,7 @@ end
 
 function extract_player_table(ply)
   local user_info = {
-    ['steam_id'] = ply:SteamID(),
+    ['steam_id'] = user_identifier(ply),
     ['name'] =  ply:GetName(),
     ['bot'] = ply:IsBot(),
     ['user_id'] = ply:UserID()
@@ -296,7 +298,13 @@ function GetDMGTypeStr(flag)
   return DAMAGE_TYPES[flag]
 end
 
-
+function user_identifier(user)
+  if DEBUG then
+    return user:GetName()
+  else
+    return user:SteamID()
+  end
+end
 
 
 -- this shall provide some useful commands
