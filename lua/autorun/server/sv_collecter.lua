@@ -1,5 +1,40 @@
 FILE_PATH = "data_collector/storage.txt"
 FOLDER_NAME = "data_collector"
+DAMAGE_TYPES = {
+  [DMG_GENERIC] = "generic",
+  [DMG_CRUSH] = "crush",
+  [DMG_BULLET] = "bullet",
+  [DMG_SLASH] = "slash",
+  [DMG_BURN] = "burn",
+  [DMG_VEHICLE] = "vehicle",
+  [DMG_FALL] = "fall",
+  [DMG_BLAST] = "blast",
+  [DMG_CLUB] = "club",
+  [DMG_SHOCK] = "shock",
+  [DMG_SONIC] = "sonic",
+  [DMG_ENERGYBEAM] = "enerybeam",
+  [DMG_PREVENT_PHYSICS_FORCE] = "prevent physics force",
+  [DMG_NEVERGIB] = "never gib", -- crossbow dmg
+  [DMG_ALWAYSGIB] = "always gib", -- dunno
+  [DMG_DROWN] = "drown",
+  [DMG_PARALYZE] = "paralyze",
+  [DMG_NERVEGAS] = "nerve gas",
+  [DMG_POISON] = "poison",
+  [DMG_RADIATION] = "radiation",
+  [DMG_DROWNRECOVER] = "drown recover",
+  [DMG_ACID] = "acid",
+  [DMG_SLOWBURN] = "slow burn",
+  [DMG_REMOVENORAGDOLL] = "remove no ragdoll",
+  [DMG_PHYSGUN] = "physic gun",
+  [DMG_PLASMA] = "plasma",
+  [DMG_AIRBOAT] = "airboat",
+  [DMG_DISSOLVE] = "dissolve",
+  [DMG_BLAST_SURFACE] = "blast surface",
+  [DMG_DIRECT] = "direct",
+  [DMG_BUCKSHOT] = "buckshot",
+  [DMG_SNIPER] = "sniper",
+  [DMG_MISSILEDEFENSE] = "missile defense"
+}
 players_alive = {}
 
 function Initialize() -- creates a data_collector directory on server start if there is none
@@ -32,6 +67,9 @@ function PlayerJoin(ply) -- saves player join information
 end
 
 function WeaponPickedUp(weapon, ply)
+  if (not ply:IsTerror()) or (not ply:IsActive()) then
+    return false
+  end
   local action = 'weapon_pickup'
   local weapon_info = extract_equipment_table(weapon)
   local action_table = {
@@ -44,27 +82,35 @@ function WeaponPickedUp(weapon, ply)
 end
 
 function RoundBegin()
-  players_alive = player.GetAll()
-  local action = 'round_start'
-  players = {}
-  for _, ply in pairs(players_alive) do
-    if ply:Team() == TEAM_SPECTATOR then
-      role = 'spectator' -- spectator roles are also innocent thats the wroason for this workaround
-    else
-      role = ply:GetRoleString()
-    end
+  local spectator_list = {}
+  local traitors_list = {}
+  local detectives_list = {}
+  local innocents_list = {}
+
+  for _, ply in ipairs(player.GetAll()) do
     local user = {
       ['user_steam_id'] = ply:SteamID(),
       ['karma'] = ply:GetLiveKarma(),
-      ['role'] = role
+      ['credits'] = ply:GetCredits()
     }
-    players = table.ForceInsert(players, user)
+    if ply:IsSpec() then
+      spectator_list = table.ForceInsert(spectator_list, user) -- spectator roles are also innocent thats the wroason for this workaround
+    elseif ply:IsTraitor() then
+      traitors_list = table.ForceInsert(traitors_list, user)
+    elseif ply:IsActiveDetective() then
+      detectives_list = table.ForceInsert(detectives_list, user)
+    else
+      innocents_list = table.ForceInsert(innocents_list, user)
+    end
   end
 
   local action_table = {
-    ['action'] = action,
+    ['action'] = 'round_start',
     ['time'] = os.time(),
-    ['players'] = players,
+    ['traitors'] = traitors_list,
+    ['detectives'] = detectives_list,
+    ['innocent'] = innocents_list,
+    ['spectator'] = spectator_list,
     ['map'] = game.GetMap()
   }
   add_table_to_file(action_table)
@@ -89,6 +135,10 @@ function RoundEnd(result)
 end
 
 function EquipmentBought(ply, equipment, is_item)
+  if (not ply:IsTerror()) or (not ply:IsAlive()) then
+    return true
+  end
+
   local action = 'equipment_bought'
   -- local user_info = extract_player_table(ply)
   local equipment_info = {
@@ -105,6 +155,8 @@ function EquipmentBought(ply, equipment, is_item)
 end
 
 function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
+  if not ply:IsActive() then return true end
+
   local action = 'corpse_searched'
   local action_table = {
     ['action'] = action,
@@ -145,46 +197,61 @@ hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
   add_table_to_file(action_table)
 end )
 
-gameevent.Listen( "player_hurt" )
-hook.Add( "player_hurt", "player_hurt", function(data)
-  local action = 'player_hurt'
-  local user = {
-    ['health'] = data.health,
-    ['user_id'] = data.userid, -- Same as Player:UserID()
-    ['attacker_id'] = data.attacker -- Same as Player:UserID()
-  }
-  local action_table = {
-    ['action'] = action,
-    ['user'] =  user,
-    ['time'] = os.time()
-  }
-  add_table_to_file(action_table)
-end )
+hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
+  if target:IsPlayer() and target:IsActive() then
+    local inflictor = dmginfo:GetInflictor()
+    local damage_info = {}
+    -- dmg_target = {}
+    -- dmg_inflictor = {} --  player
+    -- dmg_weapon = "" --     weapom | prop_physics | world | item
+    -- dmg_info = "" --       bullet | crush        | fall  | explosive
 
-hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo )
-  -- test with mineturtels and stuff
-  -- check if player == target
-  -- determine damgage inflictor, if possible inflictor user
-  -- handle case where damage inflictor != user
-  -- get user.health information
-  print(target)
-  print(dmginfo:GetInflictor())
-  print(util.WeaponFromDamage(dmginfo))
+    if inflictor:IsPlayer() or dmginfo:GetAttacker():IsPlayer() then
+      local inf_steam_id = ""
+      if inflictor:IsPlayer() then
+        inf_steam_id = inflictor:SteamID()
+      else
+        inf_steam_id = dmginfo:GetAttacker():SteamID()
+      end
 
+      damage_info = {
+        ['target'] = {
+            ['steam_id'] = target:SteamID(),
+            ['health'] = target:Health(),
+            ['position'] = target:GetPos()
+        },
+        ['inflictor'] = {
+          ['steam_id'] = inf_steam_id,
+          ['position'] = inflictor:GetPos()
+        },
+        ['weapon'] = util.WeaponFromDamage(dmginfo),
+        ['damage_points'] = dmginfo:GetDamage(),
+        ['damage_type'] = GetDMGTypeStr(dmginfo:GetDamageType())
+      }
+    else
+      damage_info = {
+        ['target'] = {
+          ['steam_id'] = target:SteamID(),
+          ['health'] = target:Health()
+        },
+        ['inflictor'] = nil, -- sollte world sein
+        ['weapon'] = util.WeaponFromDamage(dmginfo),
+        ['damage_points'] = dmginfo:GetDamage(),
+        ['damage_type'] = GetDMGTypeStr(dmginfo:GetDamageType())
+      }
+    end
 
-
-  -- local user = {
-  --   ['weapon_index'] = ents.GetByIndex(data.entindex_inflictor),
-  --   ['attacker_index'] = ents.GetByIndex(data.entindex_attacker):Name(), -- data.entindex_attacker
-  --   ['damagebits'] = data.damagebits,
-  --   ['victim_index'] = ents.GetByIndex(data.entindex_killed):Name() -- data.entindex_killed
-  -- }
-  -- local action_table = {
-  --   ['action'] = action,
-  --   ['user'] =  user,
-  --   ['time'] = os.time()
-  -- }
-  -- add_table_to_file(action_table)
+    local action_table = {
+      ['action'] = action,
+      ['target'] = damage_info['target'],
+      ['inflictor'] = damage_info['inflictor'],
+      ['weapon'] = damage_info['weapon'],
+      ['damage_points'] = damage_info['damage_points'],
+      ['damage_type'] = damage_info['damage_type'],
+      ['time'] = os.time()
+    }
+    add_table_to_file(action_table)
+  end
 end )
 
 -- //////   [ hooks ]   //////
@@ -224,6 +291,12 @@ function extract_equipment_table(equip)
   return equipment_info
 end
 
+-- Helper function to turn a dmg flag into a string representation
+function GetDMGTypeStr(flag)
+  return DAMAGE_TYPES[flag]
+end
+
+
 
 
 -- this shall provide some useful commands
@@ -249,6 +322,9 @@ end
 
   ragdolls:
   rag.player_ragdoll : bool -- true if player ragdoll else false
+
+
+  util.GetAlivePlayers() -- Alle lebenden Players
 
 
   Eigenene Hooks Können mit:
