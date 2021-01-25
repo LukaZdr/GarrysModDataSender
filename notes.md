@@ -26,6 +26,9 @@
 
   util.GetAlivePlayers() -- Alle lebenden Players
 
+  Helper:
+  WEPS.TypeForWeapon(wep:GetClass()) == weptype
+  
 
   Eigenene Hooks Können mit:
   hook.Run("HOOK_NAME", parameter...)

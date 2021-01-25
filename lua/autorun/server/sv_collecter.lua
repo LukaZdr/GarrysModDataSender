@@ -70,6 +70,16 @@ function WeaponPickedUp(weapon, ply)
   if not ply:IsTerror() then
     return false
   end
+
+  weapon_type = WEPS.TypeForWeapon(weapon:GetClass())
+  print(type(weapon))
+  for key,value in pairs(getmetatable(weapon)) do
+    print(key)
+  end
+    print("DONE\n")
+
+  print(weapon:GetSlotPos())
+
   local action = 'weapon_pickup'
   local weapon_info = extract_equipment_table(weapon)
   local action_table = {
@@ -150,7 +160,7 @@ function EquipmentBought(ply, equipment, is_item)
     ['action'] = action,
     ['user_steam_id'] = user_identifier(ply),
     ['equipment'] = equipment_info,
-    ['is_item'] = is_item       -- returns equipment_id if eqipment || returns nil if weapon
+    ['is_item'] = is_item or false
   }
   add_table_to_file(action_table)
 end
