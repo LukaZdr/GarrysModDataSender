@@ -91,7 +91,8 @@ function RoundBegin()
     local user = {
       ['user_steam_id'] = user_identifier(ply),
       ['karma'] = ply:GetLiveKarma(),
-      ['credits'] = ply:GetCredits()
+      ['credits'] = ply:GetCredits(),
+      ['items'] = ply:GetEquipmentItems()
     }
     if ply:IsSpec() then
       spectator_list = table.ForceInsert(spectator_list, user) -- spectator roles are also innocent thats the wroason for this workaround
@@ -135,7 +136,7 @@ function RoundEnd(result)
 end
 
 function EquipmentBought(ply, equipment, is_item)
-  if (not ply:IsTerror()) or (not ply:IsAlive()) then
+  if (not ply:IsTerror()) or (not ply:IsActive()) then
     return true
   end
 
@@ -175,6 +176,7 @@ function FoundDNA(ply, dna_owner, ent)
     ['action'] = action,
     ['user_steam_id'] = user_identifier(ply),
     ['suspect_steam_id'] = user_identifier(dna_owner),
+    ['time'] = os.time()
   }
   add_table_to_file(action_table)
 end
@@ -207,19 +209,21 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
     -- dmg_info = "" --       bullet | crush        | fall  | explosive
 
     if inflictor:IsPlayer() or dmginfo:GetAttacker():IsPlayer() then
+      local weapon_used = {}
       local ply = {}
-      local inf_steam_id = ""
       if inflictor:IsPlayer() then
+        -- if inflictor is player we know that a hand held weapon is used.
         ply = inflictor
-      else
+        weapon_used = util.WeaponFromDamage(dmginfo)
+      else 
+        -- if inflictor is ent(weapon/item) damage maybe from item
         ply = dmginfo:GetAttacker()
+        weapon_used = inflictor:GetClass()
       end
-
-      weapon = util.WeaponFromDamage(dmginfo)
       damage_info = {
         ['target'] = {
             ['steam_id'] = user_identifier(target),
-            ['health_before_shot'] = target:Health(),
+            ['health_before_hurt'] = target:Health(),
             ['position'] = target:GetPos(),
             ['volicity'] = target:GetVelocity()
         },
@@ -228,7 +232,7 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
           ['position'] = ply:GetPos(),
           ['volicity'] = ply:GetVelocity()
         },
-        ['weapon'] = weapon:GetClass(),
+        ['weapon'] = weapon_used,
         ['was_headshot'] = (target.was_headshot and dmginfo:IsBulletDamage()),
         ['damage_points'] = dmginfo:GetDamage(),
         ['damage_type'] = GetDMGTypesStr(dmginfo:GetDamageType())
@@ -237,12 +241,12 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
       damage_info = {
         ['target'] = {
           ['steam_id'] = user_identifier(target),
-          ['health_before_shot'] = target:Health(),
+          ['health_before_hurt'] = target:Health(),
           ['position'] = target:GetPos(),
           ['volicity'] = target:GetVelocity()
         },
         ['inflictor'] = nil, -- sollte world sein
-        ['weapon'] = weapon:GetClass(),
+        ['weapon'] = dmginfo:GetInflictor():GetClass(),
         ['was_headshot'] = (target.was_headshot and dmginfo:IsBulletDamage()),
         ['damage_points'] = dmginfo:GetDamage(),
         ['damage_type'] = GetDMGTypesStr(dmginfo:GetDamageType())
