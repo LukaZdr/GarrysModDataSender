@@ -1,6 +1,8 @@
 FILE_PATH = "data_collector/storage.txt"
 FOLDER_NAME = "data_collector"
 DEBUG = false
+WRITING_LOGS = true
+DOMAIN="localhost:8080"
 DAMAGE_TYPES = {
   [DMG_GENERIC] = "generic",
   [DMG_CRUSH] = "crush",
@@ -53,7 +55,7 @@ function ServerStart() -- saves server starting information
     ['action'] = action,
     ['time'] = os.time()
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
 
 function PlayerJoin(ply) -- saves player join information
@@ -64,7 +66,7 @@ function PlayerJoin(ply) -- saves player join information
     ['user'] = user_info,
     ['time'] = os.time()
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
 
 function WeaponPickedUp(weapon, ply)
@@ -79,7 +81,7 @@ function WeaponPickedUp(weapon, ply)
     ['ping'] = ply:Ping(),
     ['time'] = os.time()
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
 
 function RoundBegin()
@@ -87,6 +89,9 @@ function RoundBegin()
   local traitors_list = {}
   local detectives_list = {}
 
+
+  print(Ping("https://google.de/"))
+  
   for _, ply in pairs(player.GetAll()) do
     local user = {
       ['user_steam_id'] = user_identifier(ply),
@@ -119,7 +124,7 @@ function RoundBegin()
     ['spectator'] = spectator_list,
     ['map'] = game.GetMap()
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
 
 function RoundEnd(result)
@@ -178,7 +183,7 @@ function RoundEnd(result)
       ["survived"] = alive 
     }
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
 
 function EquipmentBought(ply, equipment, is_item)
@@ -203,7 +208,7 @@ function EquipmentBought(ply, equipment, is_item)
     ['ping'] = ply:Ping(),
     ['bought_equipment'] = nameOfItem
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
 
 function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
@@ -218,7 +223,7 @@ function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
     ['is_long_range'] = is_long_range,
     ['corpse_was_traitor'] = was_traitor
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
 
 function FoundDNA(ply,dna_owner, ent)
@@ -237,7 +242,7 @@ function FoundDNA(ply,dna_owner, ent)
     ['scanned_ent'] = scanned_ent, -- corpse.sid (user:SteamI()) or equipment name
     ['time'] = os.time()
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
 
 gameevent.Listen('player_disconnect')
@@ -255,7 +260,7 @@ hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
     ['user'] =  user,
     ['time'] = os.time()
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end )
 
 function UserTakesDamage(target, dmginfo)
@@ -325,7 +330,7 @@ function UserTakesDamage(target, dmginfo)
       ['was_headshot'] = damage_info['was_headshot'],
       ['time'] = os.time()
     }
-    add_table_to_file(action_table)
+    log(action_table, "endpoint")
   end
 end
 
@@ -336,8 +341,46 @@ function DefibRevive(reviver)
     ['revived'] = user_identifier(last_respawned),
     ['time'] = os.time()
   }
-  add_table_to_file(action_table)
+  log(action_table, "endpoint")
 end
+
+function HandleDeath(victim, inflictor, attacker)
+  if not IsValid(victim) or victim:IsActive() then
+    local cause = "unknown"
+    if inflictor != nil then
+      if inflictor:IsPlayer() then 
+        cause = inflictor:SteamID()
+      elseif inflictor:IsWeapon() then
+        cause = inflictor:GetClass()
+      elseif IsEntity(inflictor) then
+        cause = inflictor:GetClass()
+      else 
+        cause = inflictor
+      end
+    end
+   
+    if attacker:IsPlayer() then
+      attacker = {
+        ["steam_id"] = user_identifier(attacker),
+        ["ping"] =  attacker:Ping()
+      }
+    end
+
+    local action_table = {
+      ['action'] = 'player_was_killed',
+      ['victim'] = {
+        ["steam_id"] = user_identifier(victim),
+        ["ping"] = victim:Ping(),
+      },
+      ['attacker'] = attacker,
+      ['cause'] = cause,
+      ['time'] = os.time()
+    }
+
+    log(action_table, "endpoint")
+  end
+end
+
 
 function Spawn( ply )
   if ply:IsActive() then
@@ -358,13 +401,21 @@ hook.Add('TTTCanSearchCorpse', 'corpse_searched', CorpseSearch)
 hook.Add('TTTFoundDNA', 'found_dna', FoundDNA)
 hook.Add("EntityTakeDamage", "player_hurt", UserTakesDamage)
 hook.Add('UsedDefib', 'user_was_revived', DefibRevive)
+hook.Add('PlayerDeath', 'player_was_killed', HandleDeath)
 
 -- //////   [helpers]   //////
 
-function add_table_to_file(table)
-  local json = util.TableToJSON(table)
-  local string = json .. '\n'
-  file.Append(FILE_PATH, string)
+
+function log(table, endpoint)
+  if WRITING_LOGS then
+    local json = util.TableToJSON(table)
+    local string = json .. '\n'
+    file.Append(FILE_PATH, string)
+  else 
+    -- TODO Write request
+  end
+  
+
 end
 
 function extract_player_table(ply)
@@ -410,4 +461,38 @@ function get_pickup_info(pickup)
     ["ammo"] = game.GetAmmoName(pickup:GetPrimaryAmmoType()) or "undefined",
     ["is_weapon"] = pickup:IsWeapon()
   }
+end
+
+-- full url, with the json payload
+function LaunchJSONRequest(url, json)
+  -- enconding already defined as default
+  parameters = {
+    ["failed"] = HandleBadRequest,
+    ["success "] = HandleSuccessRequest,
+    ["method"] = "POST", --case sensitive
+    ["url"] = url,
+    ["headers"] = {["Content-Type"] = "application/json"},
+    ["body"] = json
+  }
+  return HTTP(parameters)
+end
+
+-- test connection
+function Ping(url) 
+  print("starting ping...")
+  parameters = {
+    ["failed"] = HandleBadRequest,
+    ["success "] = HandleSuccessRequest,
+    ["method"] = "GET", --case sensitive
+    ["url"] = url,
+  }
+  return HTTP(parameters)
+end
+
+function HandleSuccessRequest(code, body, table) 
+  print("success ", code, " ", body, " ", table) 
+end
+
+function HandleBadRequest(reason) 
+    print("failed ", reason) 
 end
