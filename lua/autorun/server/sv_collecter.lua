@@ -43,7 +43,7 @@ function Initialize() -- creates a data_collector directory on server start if t
     file.CreateDir(FOLDER_NAME, "DATA")
   end
   if not file.Exists(FILE_PATH, "DATA") then
-    file.Write(FILE_PATH, "// Initial Row // \n")
+    file.Write(FILE_PATH, "")
   end
 end
 
@@ -71,13 +71,12 @@ function WeaponPickedUp(weapon, ply)
   if not ply:IsTerror() then
     return false
   end
-
   local action = 'weapon_pickup'
-  local weapon_info = extract_equipment_table(weapon)
   local action_table = {
     ['action'] = action,
     ['user_steam_id'] = user_identifier(ply),
     ['picked_up'] = get_pickup_info(weapon),
+    ['ping'] = ply:Ping(),
     ['time'] = os.time()
   }
   add_table_to_file(action_table)
@@ -87,18 +86,18 @@ function RoundBegin()
   local spectator_list = {}
   local traitors_list = {}
   local detectives_list = {}
-  local innocents_list = {}
 
-  for _, ply in ipairs(player.GetAll()) do
-    print(ply:Nick())
-    print(KillsToPoints(ply, ply.was_traitor))
-
-
+  for _, ply in pairs(player.GetAll()) do
     local user = {
       ['user_steam_id'] = user_identifier(ply),
       ['karma'] = ply:GetLiveKarma(),
+      ['stats'] = {
+        ["score"] = ply:Frags(),
+        ["deaths"] = ply:Deaths(),
+      },
       ['credits'] = ply:GetCredits(),
-      ['items'] = ply:GetEquipmentItems()
+      ['items'] = ply:GetEquipmentItems(),
+      ['ping'] = ply:Ping()
     }
     if ply:IsSpec() then
       spectator_list = table.ForceInsert(spectator_list, user) -- spectator roles are also innocent thats the wroason for this workaround
@@ -135,35 +134,49 @@ function RoundEnd(result)
   end
 
   local result = {}
+  local dead = {}
+  local alive = {}
 
-
-  for key,value in pairs(getmetatable(player.GetAll()[1])) do
-      print(key)
-  end
-
-  print(player.GetAll()[1]:GetRoleString())
-
-  for key, ply in ipairs(player.GetAll()) do
-    local score = {}
-    local role = "innocent"
-    if  ply:IsAlive() then
-      print("TODO")
-
-
-      -- packet loss
+  for _, ply in pairs(player.GetAll()) do
+    if ply:IsSpec() then
+      role = "spectator"
+    elseif ply:IsTraitor() then
+      role = "traitor"
+    elseif ply:IsActiveDetective() then
+      role = "detective"
+    else
+      role = "innocent"
     end
+    
+    local user = {
+      ['user_steam_id'] = user_identifier(ply),
+      ['karma'] = ply:GetLiveKarma(),
+      ['stats'] = {
+        ["score"] = ply:Frags(),
+        ["deaths"] = ply:Deaths(),
+      },
+      ['credits'] = ply:GetCredits(),
+      ['items'] = ply:GetEquipmentItems(),
+      ['ping'] = ply:Ping(),
+      ['role'] = role
+    }
 
-    result = table.ForceInsert(result, score)
+    if ply:Alive()
+    then
+      alive = table.ForceInsert(alive, user)
+    else 
+      dead = table.ForceInsert(dead, user)
+    end
   end
-
-
-
   
   local action_table = {
     ['action'] = action,
     ['time'] = os.time(),
     ['reason'] = win_reason,
-    ['result'] = result
+    ['result'] = {
+      ["dead"] = dead,
+      ["survived"] = alive 
+    }
   }
   add_table_to_file(action_table)
 end
@@ -175,15 +188,20 @@ function EquipmentBought(ply, equipment, is_item)
 
   local action = 'equipment_bought'
   -- local user_info = extract_player_table(ply)
-  local equipment_info = {
-    ['name'] = equipment, -- returns class_name if weapon || returns id if equipment
-    ['role'] = ply:GetRoleString()
-  }
+  local nameOfItem = ""
+  -- returns class_name if weapon || returns id if equipment
+  if is_item then
+    nameOfItem = GetEquipmentItem(ply:GetRole(), is_item).name
+  else
+    nameOfItem = equipment
+  end
+
   local action_table = {
     ['action'] = action,
     ['user_steam_id'] = user_identifier(ply),
-    ['equipment'] = equipment_info,
-    ['item_id'] = is_item -- if nil than equip is not an item
+    ['is_traitor'] = ply:IsTraitor(),
+    ['ping'] = ply:Ping(),
+    ['bought_equipment'] = nameOfItem
   }
   add_table_to_file(action_table)
 end
@@ -266,12 +284,15 @@ function UserTakesDamage(target, dmginfo)
             ['steam_id'] = user_identifier(target),
             ['health_before_hurt'] = target:Health(),
             ['position'] = target:GetPos(),
-            ['volicity'] = target:GetVelocity()
+            ['volicity'] = target:GetVelocity(),
+            ['ping'] = target:Ping(),
+
         },
         ['inflictor'] = {
           ['steam_id'] = user_identifier(ply),
           ['position'] = ply:GetPos(),
-          ['volicity'] = ply:GetVelocity()
+          ['volicity'] = ply:GetVelocity(),
+          ['ping'] = ply:Ping(),
         },
         ['weapon'] = weapon_used,
         ['was_headshot'] = (target.was_headshot and dmginfo:IsBulletDamage()),
@@ -282,6 +303,7 @@ function UserTakesDamage(target, dmginfo)
       damage_info = {
         ['target'] = {
           ['steam_id'] = user_identifier(target),
+          ['ping'] = target:Ping(),
           ['health_before_hurt'] = target:Health(),
           ['position'] = target:GetPos(),
           ['volicity'] = target:GetVelocity()
@@ -355,14 +377,6 @@ function extract_player_table(ply)
   return user_info
 end
 
-function extract_equipment_table(equip)
-  local equipment_info = {
-    ['name'] = equip:GetClass(),
-    ['index'] = equip:EntIndex()
-  }
-  return equipment_info
-end
-
 -- Helper function to turn a dmg flag into a string representation
 function GetDMGTypesStr(flag)
  local dmges = {}
@@ -396,6 +410,4 @@ function get_pickup_info(pickup)
     ["ammo"] = game.GetAmmoName(pickup:GetPrimaryAmmoType()) or "undefined",
     ["is_weapon"] = pickup:IsWeapon()
   }
-
-
 end
