@@ -71,21 +71,12 @@ function WeaponPickedUp(weapon, ply)
     return false
   end
 
-  weapon_type = WEPS.TypeForWeapon(weapon:GetClass())
-  -- print(type(weapon))
- --  for key,value in pairs(getmetatable(weapon)) do
-    --print(key)
-  --end
- --   print("DONE\n")
-
-  -- print(weapon:GetSlotPos())
-
   local action = 'weapon_pickup'
   local weapon_info = extract_equipment_table(weapon)
   local action_table = {
     ['action'] = action,
     ['user_steam_id'] = user_identifier(ply),
-    ['weapon'] = weapon_info,
+    ['picked_up'] = get_pickup_info(weapon),
     ['time'] = os.time()
   }
   add_table_to_file(action_table)
@@ -160,7 +151,7 @@ function EquipmentBought(ply, equipment, is_item)
     ['action'] = action,
     ['user_steam_id'] = user_identifier(ply),
     ['equipment'] = equipment_info,
-    ['is_item'] = is_item or false
+    ['item_id'] = is_item -- if nil than equip is not an item
   }
   add_table_to_file(action_table)
 end
@@ -175,17 +166,25 @@ function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
     ['corpse_steam_id'] = corpse.sid,
     ['is_covert'] = is_covert,
     ['is_long_range'] = is_long_range,
-    ['was_traitor'] = was_traitor
+    ['corpse_was_traitor'] = was_traitor
   }
   add_table_to_file(action_table)
 end
 
-function FoundDNA(ply, dna_owner, ent)
+function FoundDNA(ply,dna_owner, ent)
+  local scanned_ent = ""
+  if ent:GetClass() == 'prop_ragdoll' then
+    scanned_ent = ent.sid
+  else
+    scanned_ent = ent:GetClass()
+  end
+
   local action = 'found_dna'
   local action_table = {
     ['action'] = action,
     ['user_steam_id'] = user_identifier(ply),
     ['suspect_steam_id'] = user_identifier(dna_owner),
+    ['scanned_ent'] = scanned_ent, -- corpse.sid (user:SteamI()) or equipment name
     ['time'] = os.time()
   }
   add_table_to_file(action_table)
@@ -209,7 +208,7 @@ hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
   add_table_to_file(action_table)
 end )
 
-hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
+function UserTakesDamage(target, dmginfo)
   if target:IsPlayer() and target:IsActive() and dmginfo:GetDamage() > 0 then
     local inflictor = dmginfo:GetInflictor()
     local damage_info = {}
@@ -224,7 +223,7 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
       if inflictor:IsPlayer() then
         -- if inflictor is player we know that a hand held weapon is used.
         ply = inflictor
-        weapon_used = util.WeaponFromDamage(dmginfo)
+        weapon_used = util.WeaponFromDamage(dmginfo):GetClass()
       else
         -- if inflictor is ent(weapon/item) damage maybe from item
         ply = dmginfo:GetAttacker()
@@ -262,12 +261,11 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
         ['damage_type'] = GetDMGTypesStr(dmginfo:GetDamageType())
       }
     end
-
     local action_table = {
       ['action'] = 'player_hurt',
       ['target'] = damage_info['target'],
       ['inflictor'] = damage_info['inflictor'],
-      ['weapon'] = damage_info['weapon'],
+      ['weapon'] = damage_info["weapon"],
       ['damage_points'] = damage_info['damage_points'],
       ['damage_type'] = damage_info['damage_type'],
       ['was_headshot'] = damage_info['was_headshot'],
@@ -275,7 +273,18 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
     }
     add_table_to_file(action_table)
   end
-end )
+end
+
+-- function DefibRevive(gamemode, owner)
+
+-- end
+
+function Spawn( ply )
+	print(ply:IsActive())
+end
+
+
+hook.Add( "PlayerSpawn", "some_unique_name", Spawn )
 
 -- //////   [ hooks ]   //////
 hook.Add('Initialize', 'InitializeFile', Initialize)
@@ -287,6 +296,8 @@ hook.Add('TTTEndRound', 'round_end', RoundEnd)
 hook.Add('TTTOrderedEquipment', 'equipment_bought', EquipmentBought)
 hook.Add('TTTCanSearchCorpse', 'corpse_searched', CorpseSearch)
 hook.Add('TTTFoundDNA', 'found_dna', FoundDNA)
+hook.Add("EntityTakeDamage", "player_hurt", UserTakesDamage)
+-- hook.Add('UsedDefib', 'user_was_revived', DefibRevive)
 
 -- //////   [helpers]   //////
 
@@ -337,4 +348,17 @@ function user_identifier(user)
   else
     return user:SteamID()
   end
+end
+
+
+function get_pickup_info(pickup)
+  print(game.GetAmmoName(pickup:GetPrimaryAmmoType()))
+  return  {
+    ["name"] = pickup:GetClass(),
+    ["type"] = WEPS.TypeForWeapon(pickup:GetClass()), -- pickup slot index
+    ["ammo"] = game.GetAmmoName(pickup:GetPrimaryAmmoType()) or "undefined",
+    ["is_weapon"] = pickup:IsWeapon()
+  }
+
+
 end
