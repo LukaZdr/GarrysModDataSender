@@ -1,6 +1,6 @@
 FILE_PATH = "data_collector/storage.txt"
 FOLDER_NAME = "data_collector"
-DEBUG = true
+DEBUG = false
 DAMAGE_TYPES = {
   [DMG_GENERIC] = "generic",
   [DMG_CRUSH] = "crush",
@@ -10,7 +10,7 @@ DAMAGE_TYPES = {
   [DMG_VEHICLE] = "vehicle",
   [DMG_FALL] = "fall",
   [DMG_BLAST] = "blast",
-  [DMG_CLUB] = "club",
+  [DMG_CLUB] = "club", -- crowbar
   [DMG_SHOCK] = "shock",
   [DMG_SONIC] = "sonic",
   [DMG_ENERGYBEAM] = "enerybeam",
@@ -198,7 +198,7 @@ hook.Add( 'player_disconnect', 'player_disconnect_example', function(data)
 end )
 
 hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
-  if target:IsPlayer() and target:IsActive() then
+  if target:IsPlayer() and target:IsActive() and dmginfo:GetDamage() > 0 then
     local inflictor = dmginfo:GetInflictor()
     local damage_info = {}
     -- dmg_target = {}
@@ -215,7 +215,6 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
       end
 
       weapon = util.WeaponFromDamage(dmginfo)
-
       damage_info = {
         ['target'] = {
             ['steam_id'] = user_identifier(target),
@@ -227,8 +226,9 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
           ['position'] = inflictor:GetPos()
         },
         ['weapon'] = weapon:GetClass(),
+        ['was_headshot'] = (target.was_headshot and dmginfo:IsBulletDamage()),
         ['damage_points'] = dmginfo:GetDamage(),
-        ['damage_type'] = GetDMGTypeStr(dmginfo:GetDamageType())
+        ['damage_type'] = GetDMGTypesStr(dmginfo:GetDamageType())
       }
     else
       damage_info = {
@@ -238,18 +238,20 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
         },
         ['inflictor'] = nil, -- sollte world sein
         ['weapon'] = weapon:GetClass(),
+        ['was_headshot'] = (target.was_headshot and dmginfo:IsBulletDamage()),
         ['damage_points'] = dmginfo:GetDamage(),
-        ['damage_type'] = GetDMGTypeStr(dmginfo:GetDamageType())
+        ['damage_type'] = GetDMGTypesStr(dmginfo:GetDamageType())
       }
     end
 
     local action_table = {
-      ['action'] = action,
+      ['action'] = 'player_hurt',
       ['target'] = damage_info['target'],
       ['inflictor'] = damage_info['inflictor'],
       ['weapon'] = damage_info['weapon'],
       ['damage_points'] = damage_info['damage_points'],
       ['damage_type'] = damage_info['damage_type'],
+      ['was_headshot'] = damage_info['was_headshot'],
       ['time'] = os.time()
     }
     add_table_to_file(action_table)
@@ -294,8 +296,20 @@ function extract_equipment_table(equip)
 end
 
 -- Helper function to turn a dmg flag into a string representation
-function GetDMGTypeStr(flag)
-  return DAMAGE_TYPES[flag]
+function GetDMGTypesStr(flag)
+ local dmges = {}
+ local exponent = 0
+ while (flag > 0)
+  do
+    if flag % 2 == 1 then
+      dmges = table.ForceInsert(dmges, DAMAGE_TYPES[2 ^ exponent])
+      flag = flag - 1
+    end
+
+    flag = flag / 2
+    exponent = exponent + 1
+  end
+  return dmges
 end
 
 function user_identifier(user)
@@ -305,40 +319,3 @@ function user_identifier(user)
     return user:SteamID()
   end
 end
-
-
--- this shall provide some useful commands
---[[
-  include("NAME DES RELATIVEN DATEIPFADES") -- einfügen von abhängigkeiten
-
-  isValid()
-
-  ply: (https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/terrortown/gamemode/player.lua)
-  (https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/terrortown/gamemode/player_ext_shd.lua)
-  :GetPos()  --
-  :GetCredits() -- credits from the player
-  :GetEquipmentItems() -- items from the player
-  :GetMaxHealth()
-  :Health()
-  :IsPlayer()  -- KA wo ich das her hab
-  :IsActive() -- Spieler noch am Leben?
-  :IsTerror() -- Im Spiel?
-  :IsSpec() -- Im Spectator
-  :IsActiveDetective()
-  :IsTraitor()
-  :IsDeadTerror()
-
-  ragdolls:
-  rag.player_ragdoll : bool -- true if player ragdoll else false
-
-
-  util.GetAlivePlayers() -- Alle lebenden Players
-
-
-  Eigenene Hooks Können mit:
-  hook.Run("HOOK_NAME", parameter...)
-
-  ENT:
-  :Initalize() -- Konstruktor funktionen???
-  self:Function() -- selbst aufruf
-  ]]
