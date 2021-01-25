@@ -67,7 +67,7 @@ function PlayerJoin(ply) -- saves player join information
 end
 
 function WeaponPickedUp(weapon, ply)
-  if (not ply:IsTerror()) or (not ply:IsActive()) then
+  if not ply:IsTerror() then
     return false
   end
   local action = 'weapon_pickup'
@@ -219,7 +219,8 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
         ['target'] = {
             ['steam_id'] = user_identifier(target),
             ['health_before_shot'] = target:Health(),
-            ['position'] = target:GetPos()
+            ['position'] = target:GetPos(),
+            ['volicity'] = target:GetVelocity()
         },
         ['inflictor'] = {
           ['steam_id'] = inf_steam_id,
@@ -234,7 +235,9 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
       damage_info = {
         ['target'] = {
           ['steam_id'] = user_identifier(target),
-          ['health_before_shot'] = target:Health()
+          ['health_before_shot'] = target:Health(),
+          ['position'] = target:GetPos(),
+          ['volicity'] = target:GetVelocity()
         },
         ['inflictor'] = nil, -- sollte world sein
         ['weapon'] = weapon:GetClass(),
