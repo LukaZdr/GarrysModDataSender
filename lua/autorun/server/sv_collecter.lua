@@ -72,13 +72,13 @@ function WeaponPickedUp(weapon, ply)
   end
 
   weapon_type = WEPS.TypeForWeapon(weapon:GetClass())
-  print(type(weapon))
-  for key,value in pairs(getmetatable(weapon)) do
-    print(key)
-  end
-    print("DONE\n")
+  -- print(type(weapon))
+ --  for key,value in pairs(getmetatable(weapon)) do
+    --print(key)
+  --end
+ --   print("DONE\n")
 
-  print(weapon:GetSlotPos())
+  -- print(weapon:GetSlotPos())
 
   local action = 'weapon_pickup'
   local weapon_info = extract_equipment_table(weapon)
