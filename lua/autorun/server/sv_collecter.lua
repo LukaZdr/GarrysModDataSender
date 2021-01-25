@@ -207,11 +207,12 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
     -- dmg_info = "" --       bullet | crush        | fall  | explosive
 
     if inflictor:IsPlayer() or dmginfo:GetAttacker():IsPlayer() then
+      local ply = {}
       local inf_steam_id = ""
       if inflictor:IsPlayer() then
-        inf_steam_id = user_identifier(inflictor)
+        ply = inflictor
       else
-        inf_steam_id = user_identifier(dmginfo:GetAttacker())
+        ply = dmginfo:GetAttacker()
       end
 
       weapon = util.WeaponFromDamage(dmginfo)
@@ -223,8 +224,9 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
             ['volicity'] = target:GetVelocity()
         },
         ['inflictor'] = {
-          ['steam_id'] = inf_steam_id,
-          ['position'] = inflictor:GetPos()
+          ['steam_id'] = user_identifier(ply),
+          ['position'] = ply:GetPos(),
+          ['volicity'] = ply:GetVelocity()
         },
         ['weapon'] = weapon:GetClass(),
         ['was_headshot'] = (target.was_headshot and dmginfo:IsBulletDamage()),
