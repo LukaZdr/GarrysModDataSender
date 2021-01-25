@@ -36,6 +36,7 @@ DAMAGE_TYPES = {
   [DMG_SNIPER] = "sniper",
   [DMG_MISSILEDEFENSE] = "missile defense"
 }
+last_respawned = {}
 
 function Initialize() -- creates a data_collector directory on server start if there is none
   if not file.IsDir(FOLDER_NAME, "DATA") then
@@ -89,6 +90,10 @@ function RoundBegin()
   local innocents_list = {}
 
   for _, ply in ipairs(player.GetAll()) do
+    print(ply:Nick())
+    print(KillsToPoints(ply, ply.was_traitor))
+
+
     local user = {
       ['user_steam_id'] = user_identifier(ply),
       ['karma'] = ply:GetLiveKarma(),
@@ -128,10 +133,37 @@ function RoundEnd(result)
   else
     win_reason = 'win_timelimit'
   end
+
+  local result = {}
+
+
+  for key,value in pairs(getmetatable(player.GetAll()[1])) do
+      print(key)
+  end
+
+  print(player.GetAll()[1]:GetRoleString())
+
+  for key, ply in ipairs(player.GetAll()) do
+    local score = {}
+    local role = "innocent"
+    if  ply:IsAlive() then
+      print("TODO")
+
+
+      -- packet loss
+    end
+
+    result = table.ForceInsert(result, score)
+  end
+
+
+
+  
   local action_table = {
     ['action'] = action,
     ['time'] = os.time(),
-    ['result'] = win_reason
+    ['reason'] = win_reason,
+    ['result'] = result
   }
   add_table_to_file(action_table)
 end
@@ -275,17 +307,23 @@ function UserTakesDamage(target, dmginfo)
   end
 end
 
--- function DefibRevive(gamemode, owner)
-
--- end
-
-function Spawn( ply )
-	print(ply:IsActive())
+function DefibRevive(reviver)
+  local action_table = {
+    ['action'] = 'player_revived',
+    ['reviver'] = user_identifier(reviver),
+    ['revived'] = user_identifier(last_respawned),
+    ['time'] = os.time()
+  }
+  add_table_to_file(action_table)
 end
 
+function Spawn( ply )
+  if ply:IsActive() then
+    last_respawned = ply
+  end
+end
 
 hook.Add( "PlayerSpawn", "some_unique_name", Spawn )
-
 -- //////   [ hooks ]   //////
 hook.Add('Initialize', 'InitializeFile', Initialize)
 hook.Add('Initialize', 'ServerStart', ServerStart)
@@ -297,7 +335,7 @@ hook.Add('TTTOrderedEquipment', 'equipment_bought', EquipmentBought)
 hook.Add('TTTCanSearchCorpse', 'corpse_searched', CorpseSearch)
 hook.Add('TTTFoundDNA', 'found_dna', FoundDNA)
 hook.Add("EntityTakeDamage", "player_hurt", UserTakesDamage)
--- hook.Add('UsedDefib', 'user_was_revived', DefibRevive)
+hook.Add('UsedDefib', 'user_was_revived', DefibRevive)
 
 -- //////   [helpers]   //////
 
@@ -352,7 +390,6 @@ end
 
 
 function get_pickup_info(pickup)
-  print(game.GetAmmoName(pickup:GetPrimaryAmmoType()))
   return  {
     ["name"] = pickup:GetClass(),
     ["type"] = WEPS.TypeForWeapon(pickup:GetClass()), -- pickup slot index
