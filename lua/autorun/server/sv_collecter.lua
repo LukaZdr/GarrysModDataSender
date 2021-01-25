@@ -215,7 +215,7 @@ hook.Add( "EntityTakeDamage", "EntityDamageExample2", function(target, dmginfo)
         -- if inflictor is player we know that a hand held weapon is used.
         ply = inflictor
         weapon_used = util.WeaponFromDamage(dmginfo)
-      else 
+      else
         -- if inflictor is ent(weapon/item) damage maybe from item
         ply = dmginfo:GetAttacker()
         weapon_used = inflictor:GetClass()
