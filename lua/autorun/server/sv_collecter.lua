@@ -420,8 +420,7 @@ function extract_player_table(ply)
   local user_info = {
     ['steam_id'] = user_identifier(ply),
     ['name'] =  ply:GetName(),
-    ['bot'] = ply:IsBot(),
-    ['user_id'] = ply:UserID()
+    ['bot'] = ply:IsBot()
   }
   return user_info
 end
