@@ -91,7 +91,7 @@ function RoundBegin()
 
 
   print(Ping("https://google.de/"))
-  
+
   for _, ply in pairs(player.GetAll()) do
     local user = {
       ['user_steam_id'] = user_identifier(ply),
@@ -152,7 +152,7 @@ function RoundEnd(result)
     else
       role = "innocent"
     end
-    
+
     local user = {
       ['user_steam_id'] = user_identifier(ply),
       ['karma'] = ply:GetLiveKarma(),
@@ -169,18 +169,18 @@ function RoundEnd(result)
     if ply:Alive()
     then
       alive = table.ForceInsert(alive, user)
-    else 
+    else
       dead = table.ForceInsert(dead, user)
     end
   end
-  
+
   local action_table = {
     ['action'] = action,
     ['time'] = os.time(),
     ['reason'] = win_reason,
     ['result'] = {
       ["dead"] = dead,
-      ["survived"] = alive 
+      ["survived"] = alive
     }
   }
   log(action_table, "endpoint")
@@ -348,17 +348,17 @@ function HandleDeath(victim, inflictor, attacker)
   if not IsValid(victim) or victim:IsActive() then
     local cause = "unknown"
     if inflictor != nil then
-      if inflictor:IsPlayer() then 
+      if inflictor:IsPlayer() then
         cause = inflictor:SteamID()
       elseif inflictor:IsWeapon() then
         cause = inflictor:GetClass()
       elseif IsEntity(inflictor) then
         cause = inflictor:GetClass()
-      else 
+      else
         cause = inflictor
       end
     end
-   
+
     if attacker:IsPlayer() then
       attacker = {
         ["steam_id"] = user_identifier(attacker),
@@ -411,11 +411,9 @@ function log(table, endpoint)
     local json = util.TableToJSON(table)
     local string = json .. '\n'
     file.Append(FILE_PATH, string)
-  else 
+  else
     -- TODO Write request
   end
-  
-
 end
 
 function extract_player_table(ply)
@@ -478,7 +476,7 @@ function LaunchJSONRequest(url, json)
 end
 
 -- test connection
-function Ping(url) 
+function Ping(url)
   print("starting ping...")
   parameters = {
     ["failed"] = HandleBadRequest,
@@ -489,10 +487,10 @@ function Ping(url)
   return HTTP(parameters)
 end
 
-function HandleSuccessRequest(code, body, table) 
-  print("success ", code, " ", body, " ", table) 
+function HandleSuccessRequest(code, body, table)
+  print("success ", code, " ", body, " ", table)
 end
 
-function HandleBadRequest(reason) 
-    print("failed ", reason) 
+function HandleBadRequest(reason)
+    print("failed ", reason)
 end
