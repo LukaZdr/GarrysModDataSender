@@ -11,7 +11,7 @@ https://www.troubleinterroristtown.com/development/
 Garry's Mod needs a parameter set in order for this to work on localhost.
 
 Parameter:
--allowlocalhttp
+`-allowlocalhttp`
 
 How to set game Paraeters:
 https://wiki.facepunch.com/gmod/Command_Line_Parameters
