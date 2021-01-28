@@ -89,9 +89,6 @@ function RoundBegin()
   local traitors_list = {}
   local detectives_list = {}
 
-
-  print(Ping("https://google.de/"))
-
   for _, ply in pairs(player.GetAll()) do
     local user = {
       ['user_steam_id'] = user_identifier(ply),
@@ -143,7 +140,7 @@ function RoundEnd(result)
   local alive = {}
 
   for _, ply in pairs(player.GetAll()) do
-    if ply:IsSpec() then
+    if ply:IsSpec() and not ply:IsTerror() then
       role = "spectator"
     elseif ply:IsTraitor() then
       role = "traitor"
