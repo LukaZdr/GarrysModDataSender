@@ -1,7 +1,7 @@
 FILE_PATH = "data_collector/storage.txt"
 FOLDER_NAME = "data_collector"
 DEBUG = false
-WRITING_LOGS = false
+WRITING_LOGS = true
 DOMAIN="localhost:3000"
 DAMAGE_TYPES = {
   [DMG_GENERIC] = "generic",
@@ -85,9 +85,10 @@ function WeaponPickedUp(weapon, ply)
 end
 
 function RoundBegin()
-  local spectator_list = {}
+  local spectators_list = {}
   local traitors_list = {}
   local detectives_list = {}
+  local innocents_list = {}
 
   for _, ply in pairs(player.GetAll()) do
     local user = {
@@ -102,7 +103,7 @@ function RoundBegin()
       ['ping'] = ply:Ping()
     }
     if ply:IsSpec() then
-      spectator_list = table.ForceInsert(spectator_list, user) -- spectator roles are also innocent thats the wroason for this workaround
+      spectators_list = table.ForceInsert(spectators_list, user) -- spectator roles are also innocent thats the wroason for this workaround
     elseif ply:IsTraitor() then
       traitors_list = table.ForceInsert(traitors_list, user)
     elseif ply:IsActiveDetective() then
@@ -117,8 +118,8 @@ function RoundBegin()
     ['time'] = os.time(),
     ['traitors'] = traitors_list,
     ['detectives'] = detectives_list,
-    ['innocent'] = innocents_list,
-    ['spectator'] = spectator_list,
+    ['innocents'] = innocents_list,
+    ['spectators'] = spectators_list,
     ['map'] = game.GetMap()
   }
   log(action_table, "endpoint")
