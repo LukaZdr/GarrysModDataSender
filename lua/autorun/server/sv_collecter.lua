@@ -1,7 +1,7 @@
 FILE_PATH = "data_collector/storage.txt"
 FOLDER_NAME = "data_collector"
 DEBUG = false
-WRITING_LOGS = true
+WRITING_LOGS = false
 DOMAIN="localhost:3000"
 DAMAGE_TYPES = {
   [DMG_GENERIC] = "generic",
@@ -55,7 +55,7 @@ function ServerStart() -- saves server starting information
     ['action'] = action,
     ['time'] = os.time()
   }
-  log(action_table, "endpoint")
+  log(action_table, "/api/v1/server_start")
 end
 
 function PlayerJoin(ply) -- saves player join information
@@ -66,7 +66,7 @@ function PlayerJoin(ply) -- saves player join information
     ['user'] = user_info,
     ['time'] = os.time()
   }
-  log(action_table, "endpoint")
+  log(action_table, "/api/v1/users")
 end
 
 function WeaponPickedUp(weapon, ply)
@@ -279,7 +279,11 @@ function UserTakesDamage(target, dmginfo)
       else
         -- if inflictor is ent(weapon/item) damage maybe from item
         ply = dmginfo:GetAttacker()
-        weapon_used = inflictor:GetClass()
+        if IsValid(inflictor) then
+          weapon_used = inflictor:GetClass()
+        else
+          weapon_used = 'unknown'
+        end
       end
       damage_info = {
         ['target'] = {
@@ -344,7 +348,7 @@ end
 function HandleDeath(victim, inflictor, attacker)
   if not IsValid(victim) or victim:IsActive() then
     local cause = "unknown"
-    if inflictor != nil then
+    if IsValid(inflictor) then
       if inflictor:IsPlayer() then
         cause = inflictor:SteamID()
       elseif inflictor:IsWeapon() then
@@ -404,12 +408,14 @@ hook.Add('PlayerDeath', 'player_was_killed', HandleDeath)
 
 
 function log(table, endpoint)
+  local json = util.TableToJSON(table)
   if WRITING_LOGS then
-    local json = util.TableToJSON(table)
     local string = json .. '\n'
     file.Append(FILE_PATH, string)
   else
-    -- TODO Write request
+    local url = DOMAIN .. endpoint
+    print(url)
+    LaunchJSONRequest(url, json)
   end
 end
 
