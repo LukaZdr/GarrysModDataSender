@@ -155,8 +155,8 @@ function RoundEnd(result)
       ['user_steam_id'] = user_identifier(ply),
       ['karma'] = ply:GetLiveKarma(),
       ['stats'] = {
-        ["score"] = ply:Frags(),
-        ["deaths"] = ply:Deaths(),
+        ["score"] = ply:Frags(),  -- score on the other hand is importatnt since it can reach negative values (would flatten this also)
+        ["deaths"] = ply:Deaths(),  -- wouldn't like to save deaths here since we get it from the round actions
       },
       ['credits'] = ply:GetCredits(),
       ['items'] = ply:GetEquipmentItems(),
