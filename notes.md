@@ -1,42 +1,40 @@
 -- this shall provide some useful commands
 --[[
-  include("NAME DES RELATIVEN DATEIPFADES") -- einfügen von abhängigkeiten
+include("NAME DES RELATIVEN DATEIPFADES") -- einfügen von abhängigkeiten
 
-  isValid()
+isValid()
 
-  ply: (https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/terrortown/gamemode/player.lua)
-  (https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/terrortown/gamemode/player_ext_shd.lua)
-  :GetPos()  --
-  :GetCredits() -- credits from the player
-  :GetEquipmentItems() -- items from the player
-  :GetMaxHealth()
-  :Health()
-  :IsPlayer()  -- KA wo ich das her hab
-  :IsActive() -- Spieler noch am Leben?
-  :IsTerror() -- Im Spiel?
-  :IsSpec() -- Im Spectator
-  :IsActiveDetective()
-  :IsTraitor()
-  :IsDeadTerror()
-  :GetVelocity()
+ply: (https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/terrortown/gamemode/player.lua)
+(https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/terrortown/gamemode/player_ext_shd.lua)
+:GetPos() --
+:GetCredits() -- credits from the player
+:GetEquipmentItems() -- items from the player
+:GetMaxHealth()
+:Health()
+:IsPlayer() -- KA wo ich das her hab
+:IsActive() -- Spieler noch am Leben?
+:IsTerror() -- Im Spiel?
+:IsSpec() -- Im Spectator
+:IsActiveDetective()
+:IsTraitor()
+:IsDeadTerror()
+:GetVelocity()
 
-  ragdolls:
-  rag.player_ragdoll : bool -- true if player ragdoll else false
+ragdolls:
+rag.player_ragdoll : bool -- true if player ragdoll else false
 
+util.GetAlivePlayers() -- Alle lebenden Players
 
-  util.GetAlivePlayers() -- Alle lebenden Players
+Helper:
+WEPS.TypeForWeapon(wep:GetClass()) == weptype
 
-  Helper:
-  WEPS.TypeForWeapon(wep:GetClass()) == weptype
-  
+Eigenene Hooks Können mit:
+hook.Run("HOOK_NAME", parameter...)
 
-  Eigenene Hooks Können mit:
-  hook.Run("HOOK_NAME", parameter...)
-
-  ENT:
-  :Initalize() -- Konstruktor funktionen???
-  self:Function() -- selbst aufruf
-  ]]
+ENT:
+:Initalize() -- Konstruktor funktionen???
+self:Function() -- selbst aufruf
+]]
 
 HasEquipment
 GiveAmmo
@@ -57,7 +55,7 @@ GetAvoidDetective
 GetVehicle
 IsSuitEquipped
 SetStepSize
-__index
+**index
 SetFOV
 SpecDM_EnableUpdate
 HasEquipmentWeapon
@@ -90,7 +88,7 @@ PrintMessage
 ShouldScore
 SetGhost
 WantsToDM
-__tostring
+**tostring
 SpecDM_Error
 SendEquipment
 GetAllowWeaponsInVehicle
@@ -205,7 +203,7 @@ SetMaxSpeed
 GetRoleStringRaw
 TimeConnected
 GetMaxSpeed
-__newindex
+\_\_newindex
 EnterVehicle
 SetCrouchedWalkSpeed
 SetLaggedMovementValue
