@@ -3,7 +3,7 @@ TTTStatistics
   Created by github.com/LukaZdr and github.com/P0werE
 
 
-Gathers information oabout the game
+Gathers information about the game
 
 
 
@@ -33,50 +33,55 @@ https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/base/game
 --[ GLOBALS ]
 -- We know globals are bad code, but we didnt see a better way to achieve this which was simple enough
 
--- //////   [ File DB Flags ]   ////// 
---    Flag to allow game logs to be written
-WRITING_LOGS = true
+-- //////   [ File DB Flags ]   //////
+--    Flag to allow game logs to  be written
+local TTT_STATS_WRITING_LOGS = true
 --    Flag to allow game to send the logs to the host via http
-WRITE_TO_DB = false
-
+local TTT_STATS_WRITE_TO_DB = true
 
 --  //////   [ File IO Flags ]   //////
 --    Foldername where statistics will be written to
 --    filename will be "session" followed by the timestamp in YEARMONTHDAYHOURMINUTE
-FOLDER_NAME = "ttt_statistics"
+local TTT_STATS_FOLDER_NAME = "ttt_statistics"
 --    global variable which will be written over by the Initialize Hook
 --    points to the current file to which the logs will be written to
-SESSION_FILE=""
+local TTT_STATS_SESSION_FILE=""
 
 
 
 -- //////   [ File DB Flags ]   //////
 -- Host to send the data to
-HOST="http://testpost.gmod:8080"
+local TTT_STATS_HOST="http://testpost.gmod:8080"
 -- Http Methods as globals which need to be uppercase
-HTTP_METHOD_POST = 'POST'
-HTTP_METHOD_PATCH = 'PATCH'
-HTTP_METHOD_GET = 'GET'
+local TTT_STATS_HTTP_METHOD_POST = 'POST'
+local TTT_STATS_HTTP_METHOD_PATCH = 'PATCH'
+local TTT_STATS_HTTP_METHOD_GET = 'GET'
 -- allow to write the data to the database
-DB_PRINT_SUCCESSFUL = true
-
--- Round_ID will point to the current round of the game+
--- This global will be overwritten
-ROUND_ID = "preparing"
+local TTT_STATS_DB_PRINT_SUCCESSFUL = true
 
 
+-- Meta Class
+local TTTStatistics = { roundid = "preparing", folderpath = TTT_STATS_FOLDER_NAME, file = ""}
 
+function TTTStatistics:new(t)
+  local tt = t  or {}
+  tt =  setmetatable(tt, self)
+  self.__index = self
+  self.roundid = "preparing"
+  self.logs = TTT_STATS_WRITING_LOGS
+  self.db = TTT_STATS_WRITE_TO_DB
+  self.folderpath = TTT_STATS_FOLDER_NAME
+  self.dbLogSuccess = TTT_STATS_DB_PRINT_SUCCESSFUL
+  self.file = ""
+  return tt
+end
 
--- //////   [ hooks ]   ////// [ROUND_ID = "preparing" ]
--- This global will be overwritten  by the whenever a new round start or ends 
--- (f.e PrepareRound RoundStart RoundOver)
-ROUND_ID = "preparing"
 
 
 -- Look up table to dissolbe the bit flag to a usable string
 -- Note: that a damage can have multiple damage types
 -- https://wiki.facepunch.com/gmod/Enums/DMG
-DAMAGE_TYPES = {
+local DAMAGE_TYPES = {
   [DMG_GENERIC] = "generic",
   [DMG_CRUSH] = "crush",
   [DMG_BULLET] = "bullet",
@@ -114,63 +119,42 @@ DAMAGE_TYPES = {
 
 
 
--- //////   [ hooks  ]   //////
--- NOTE: that the hooks need to return nil or nothing to propate propably through
-gameevent.Listen('player_disconnect')
-hook.Add('Initialize', 'TTTStatisticsInitializeFile', Initialize)
-hook.Add('PlayerInitialSpawn', 'TTTStatisticsPlayerJoin', PlayerJoin)
-hook.Add('WeaponEquip', 'TTTStatisticsWeaponEquipExample', ItemPickedUp)
-hook.Add('TTTBeginRound', 'TTTStatisticsRoundBegin', RoundBegin)
-hook.Add('TTTEndRound', 'TTTStatisticsRoundEnd', RoundEnd)
-hook.Add('TTTPrepareRound', 'TTTStatisticsRoundPrepare',  PrepareRound)
-hook.Add('TTTOrderedEquipment', 'TTTStatisticsEquipmentBought', EquipmentBought)
--- hook.Add('TTTCanSearchCorpse', 'TTTStatisticsCorpseSearchedExample', CorpseSearch) This hook is being weird, regarding identifying of corpse and the confirmed dead table
-hook.Add('TTTFoundDNA', 'TTT_StatisticsFoundDna', FoundDNA)
-hook.Add("EntityTakeDamage", "TTTStatisticsPlayerHurt", PlayerTakesDamage)
-hook.Add('UsedDefib', 'TTTStatisticsUserWasRevived', DefibRevive)
-hook.Add('PlayerDeath', 'TTTStatisticsPlayerWasKilled', PlayerDied)
-hook.Add( "PlayerSpawn", "TTTStatisticsPlayerSpawn", Spawn)
-hook.Add( 'player_disconnect', 'TTTStatisticsPlayerDisconnect', PlayerDisconnect)
-hook.Add('ShutDown', 'TTTStatisticsServerShuttingDown', ServerClose)
-
-
-
  -- Initialize called by the Initialize hook 
  -- Creates a directory under "data" and sets the Session filename to the current timestamp
-function Initialize()
-  SESSION_FILE = FOLDER_NAME .. "/session_" .. os.date("%Y%m%d%H%M", os.time()) .. ".txt"
-  ServerLog("TTTStatistics Active:: " , "WRITING_LOGS" , WRITING_LOGS , " WRITE_TO_DB: " ,  WRITE_TO_DB )
-  ServerStart()
+function TTTStatistics:Initialize()
+  self.file = "session_" .. os.date("%Y%m%d%H%M", os.time()) .. ".txt"
+  print("TTTStatistics: " , "WRITING_LOGS " , self.logs , " WRITE_TO_DB: " ,  self.db)
+  self:ServerStart()
 end
 
 
 -- ServerStart
 -- Sends a serverstart request to the db host
-function ServerStart() 
+function TTTStatistics:ServerStart() 
   local action = 'server start'
   local action_table = {
     ['action'] = action,
     ['time'] = EpochTime(),
     ['map'] = game.GetMap()
   }
-  Request(HTTP_METHOD_POST, '/api/v1/server', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/server', action_table)
 end
 
 
 -- ServerClose
 -- Sends a ServerClose request to the db host to call the closing of a session
-function ServerClose() 
+function TTTStatistics:ServerClose() 
   local action = "server shutting down"
   local action_table = {
     ['action'] = action,
     ['time'] = EpochTime()
   }
-  Request(HTTP_METHOD_PATCH, '/api/v1/server', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_PATCH, '/api/v1/server', action_table)
 end
 
 -- PlayerJoins
 -- Logs the event of a player connecting to the database
-function PlayerJoin(ply)
+function TTTStatistics:PlayerJoin(ply)
   local action = 'player connect'
   local user_info = ExtractPlayerTable(ply)
   local action_table = {
@@ -178,12 +162,12 @@ function PlayerJoin(ply)
     ['user'] = user_info,
     ['time'] = EpochTime()
   }
-  Request(HTTP_METHOD_POST, '/api/v1/actions/player/connect', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/connect', action_table)
 end
 
 -- PlayerJoins
 -- Logs the event of a player disconnecting from the server which includes
-function PlayerDisconnect(data)
+function TTTStatistics:PlayerDisconnect(data)
   local action = 'player disconnect'
   local user = {
     ['steam_id'] = data.networkid,
@@ -195,7 +179,7 @@ function PlayerDisconnect(data)
     ['user'] =  user,
     ['time'] = EpochTime()
   }
-  Request(HTTP_METHOD_POST, '/api/v1/actions/player/disconnect', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/disconnect', action_table)
 end
 
 -- PlayerTakesDamage
@@ -203,7 +187,7 @@ end
 -- A Guard is defined to only select player information
 -- Note: We need to check if the player is alive in order to avoid the
 --      logging of the spectator deathmatch
-function PlayerTakesDamage(target, dmginfo)
+function TTTStatistics:PlayerTakesDamage(target, dmginfo)
   if not (target:IsPlayer() and target:IsActive() and dmginfo:GetDamage() > 0) then
     return
   end
@@ -273,7 +257,7 @@ function PlayerTakesDamage(target, dmginfo)
     }
   end
   
-  local roundid = ROUND_ID
+  local roundid = self.roundid
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = 'player takes damge',
@@ -286,7 +270,7 @@ function PlayerTakesDamage(target, dmginfo)
     ['time'] = EpochTime()
   }
 
-  Request(HTTP_METHOD_POST, '/api/v1/actions/player/damage', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/damage', action_table)
 end
 
 -- PlayerDied
@@ -294,10 +278,12 @@ end
 -- Gathers information of the victim, the weapon used and the attacker
 -- Note: We need to check if the player is alive in order to avoid the
 --      logging of the spectator deathmatch
-function PlayerDied(victimPlayer, inflictorEntity, attackerEntity)
-  if IsValid(victimPlayer) and not victimPlayer:IsActive()  then
-    return nil
+function TTTStatistics:PlayerDied(victimPlayer, inflictorEntity, attackerEntity)
+  if (not IsValid(victimPlayer)) or (not victimPlayer:IsPlayer()) then
+    print("killed entity")
+    return
   end
+  print("killed player")
 
   local cause = "unknown"
   local attacker = nil
@@ -329,7 +315,7 @@ function PlayerDied(victimPlayer, inflictorEntity, attackerEntity)
     }
   end
   
-  local roundid = ROUND_ID
+  local roundid = self.roundid
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = 'player was killed',
@@ -342,12 +328,11 @@ function PlayerDied(victimPlayer, inflictorEntity, attackerEntity)
     ['time'] = EpochTime()
   }
 
-
-  Request(HTTP_METHOD_POST, '/api/v1/actions/player/killed', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/killed', action_table)
 end
 
-function DefibRevive(reviver)
-  local roundid = ROUND_ID
+function TTTStatistics:DefibRevive(reviver)
+  local roundid = self.roundid
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = 'player revived',
@@ -355,14 +340,14 @@ function DefibRevive(reviver)
     ['revived'] = UserIdentifier(last_respawned),
     ['time'] = EpochTime()
   }
-  Request(HTTP_METHOD_POST, '/api/v1/actions/player/revive', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/revive', action_table)
 end
 
 -- EquipmentBought
 -- Logs the event of any entity buying something of the shop (traitor or detective, (and possibly an innocent shop))
-function EquipmentBought(ply, equipment, is_item)
+function TTTStatistics:EquipmentBought(ply, equipment, is_item)
   if (not ply:IsTerror()) or (not ply:IsActive()) then
-    return nil -- allow propegation of all the other hooks 
+    return -- allow propegation of all the other hooks 
   end
 
   local action = 'equipment_bought'
@@ -374,7 +359,7 @@ function EquipmentBought(ply, equipment, is_item)
   else
     nameOfItem = equipment
   end
-  local roundid = ROUND_ID
+  local roundid = self.roundid
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = action,
@@ -384,20 +369,20 @@ function EquipmentBought(ply, equipment, is_item)
     ['item'] = nameOfItem,
     ['time'] = EpochTime()
   }
-  Request(HTTP_METHOD_POST, '/api/v1/actions/items/bought', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/items/bought', action_table)
 end
 
 
 -- ItemPickedUp
 -- Logs the event of picking up an item
 -- Note that the item type can be determined by the slot of the item f.e. 4 -> Primary Weapon
-function ItemPickedUp(weapon, ply)
+function TTTStatistics:ItemPickedUp(weapon, ply)
   if not ply:IsTerror() then
-    return nil -- return nil to allow propegation of all the other hooks
+    return -- return nil to allow propegation of all the other hooks
   end
 
   local action = 'item pickup'
-  local roundid = ROUND_ID
+  local roundid = self.roundid
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = action,
@@ -406,14 +391,14 @@ function ItemPickedUp(weapon, ply)
     ['ping'] = ply:Ping(),
     ['time'] = EpochTime()
   }
-  Request(HTTP_METHOD_POST, '/api/v1/actions/items/pickup', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/items/pickup', action_table)
 end
 
 
 -- RoundBegin
 -- Logs the event of a new round begin
 -- Gathers the information for a new round 
-function RoundBegin()
+function TTTStatistics:RoundBegin()
   local spectators_list = {}
   local traitors_list = {}
   local detectives_list = {}
@@ -442,8 +427,8 @@ function RoundBegin()
   end
 
   
-  ROUND_ID = tostring(EpochTime())
-  local roundid = ROUND_ID
+  self.roundid = tostring(EpochTime())
+  local roundid = self.roundid
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = 'round start',
@@ -454,14 +439,14 @@ function RoundBegin()
     ['spectators'] = spectators_list,
     ['map'] = game.GetMap()
   }
-  Request(HTTP_METHOD_POST, ' /api/v1/round', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, ' /api/v1/round', action_table)
 end
 
 
 -- RoundEnd
 -- Logs the event of a round end
 -- Gathers the information of end round
-function RoundEnd(result)
+function TTTStatistics:RoundEnd(result)
   local action = 'round end'
   win_reason = ''
   if result == WIN_TRAITOR then
@@ -496,7 +481,7 @@ function RoundEnd(result)
     end
   end
 
-  local roundid = ROUND_ID -- maybe obstructed by racing condition
+  local roundid = self.roundid -- maybe obstructed by racing condition
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = action,
@@ -508,20 +493,19 @@ function RoundEnd(result)
     }
   }
 
-  ROUND_ID = "preparing" -- GLOBAL VARIALE which propegate the round id of the current run
-  
-  Request(HTTP_METHOD_PATCH, '/api/v1/round', action_table)
-  RoundOver() 
+  self.roundid = "preparing" -- GLOBAL VARIALE which propegate the round id of the current run
+  self:Request(TTT_STATS_HTTP_METHOD_PATCH, '/api/v1/round', action_table)
+  self:RoundOver()
 end
 
 -- CorpseSearch
 -- Logs the event of a CorpseSearch
 -- Gathers the information CorpseSearch note that here there is a requirement of if the corpse can be searched
-function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
+function TTTStatistics:CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
   if not ply:IsActive() then return true end
 
   local action = 'corpse searched'
-  local roundid = ROUND_ID
+  local roundid = self.roundid
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = action,
@@ -532,15 +516,14 @@ function CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
     ['corpse_was_traitor'] = was_traitor,
     ['time'] = EpochTime()
   }
-  Request(HTTP_METHOD_POST, '/api/v1/actions/search/corpse', action_table)
-  return true
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/search/corpse', action_table)
 end
 
 
 -- FoundDNA
 -- Logs the event of a FoundDNA
 -- Gathers the information FoundDNA
-function FoundDNA(ply,dna_owner, ent)
+function TTTStatistics:FoundDNA(ply,dna_owner, ent)
   local scanned_ent = ""
   local isProp = false
   if ent:GetClass() == 'prop_ragdoll' then
@@ -550,7 +533,7 @@ function FoundDNA(ply,dna_owner, ent)
   end
 
   local action = 'found dna'
-  local roundid = ROUND_ID
+  local roundid = self.roundid
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = action,
@@ -560,7 +543,7 @@ function FoundDNA(ply,dna_owner, ent)
     ['is_prop'] = isProp,
     ['time'] = EpochTime()
   }
-  Request(HTTP_METHOD_POST, '/api/v1/actions/search/dna', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/search/dna', action_table)
 end
 
 
@@ -573,9 +556,9 @@ end
 -- PrepareRound
 -- Logs the event of a PrepareRound
 -- Gathers the information PrepareRound
-function PrepareRound()
-  ROUND_ID = tostring(EpochTime())
-  local roundid = ROUND_ID
+function TTTStatistics:PrepareRound()
+  self.roundid = tostring(EpochTime())
+  local roundid = self.roundid
   local action_table = {
    ['roundid'] = roundid,
    ['action'] = 'round prepare',
@@ -583,15 +566,15 @@ function PrepareRound()
    ['time'] = EpochTime(),
    ['map'] = game.GetMap()
   }
-  Request(HTTP_METHOD_POST, ' /api/v1/round/prepare', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, ' /api/v1/round/prepare', action_table)
 end
 
 -- RoundOver
 -- Logs the event of a RoundOver
 -- Gathers the information RoundOver
-function RoundOver() 
-  ROUND_ID = tostring(EpochTime())
-  local roundid = ROUND_ID
+function TTTStatistics:RoundOver()
+  self.roundid = tostring(EpochTime())
+  local roundid = self.roundid
   local action_table = {
    ['roundid'] = roundid,
    ['action'] = 'round prepare',
@@ -599,7 +582,7 @@ function RoundOver()
    ['time'] = EpochTime(),
    ['map'] = game.GetMap()
   }
-  Request(HTTP_METHOD_POST, ' /api/v1/round/over', action_table)
+  self.Request(TTT_STATS_HTTP_METHOD_POST, ' /api/v1/round/over', action_table)
 end
 
 
@@ -645,11 +628,11 @@ function GetPickUpInfo(pickup)
 end
 
 
-function Log(table)
-  file.CreateDir(FOLDER_NAME)
+function TTTStatistics:Log(table)
+  file.CreateDir(self.folderpath)
   local json = util.TableToJSON(table)
   local string = json .. '\n'
-  file.Append(SESSION_FILE, string)
+  file.Append(self.folderpath .. "/" .. self.file, string)
 end
 
 -- split a string by its separator into a list
@@ -667,32 +650,29 @@ end
 GMSTAT_HOOK="GMSTATISTIC_MAKE_REQUEST"
 GMSTAT_HOOKID="GMSTATISTIC_MAKE_REQUESTID"
 
-hook.Add(GMSTAT_HOOK, GMSTAT_HOOKID, AsyncRequest)
-
-
-function Request(method, url, body)
-  if WRITING_LOGS  then
-    Log(table.Copy(body))
+function TTTStatistics:Request(method, url, body)
+  if self.logs then
+    self:Log(table.Copy(body))
   end
 
-  if WRITE_TO_DB then
+  if self.db then
     hook.Call(GMSTAT_HOOK, GMSTAT_HOOKID, method, url, body, "my_auth_token")
   end
 end
 
 function AsyncRequest(method, url, body, token)
   local json = util.TableToJSON(body)
-  url = HOST .. url
+  url = TTT_STATS_HOST .. url
   local parameters = {
     ["failed"] = function (reason)
       error("TTTStatistics: Failed Request: " .. method .. " " ..  url ..": " ..reason)
     end,
     ["success"] = function (code, body, table)
       if not (code == 200) then
-        ServerLog("TTTStatistics: Failed Request with body: " .. json)
+        print("TTTStatistics: Failed Request with body: " .. json)
         error("TTTStatistics: Failed Request: " .. method .. " " ..  url .. " ".. util.NiceFloat(code) .. " ".. body, 2)
-      elseif DB_PRINT_SUCCESSFUL then
-        ServerLog("TTTStatistics: Success Request: " ..  method .. " " ..  url .. "\n")
+      elseif TTT_STATS_DB_PRINT_SUCCESSFUL then
+        print("TTTStatistics: Success Request: " ..  method .. " " ..  url .. "\n")
       end
     end,
     ["method"] = method , --case sensitive
@@ -705,3 +685,29 @@ function AsyncRequest(method, url, body, token)
   }
   HTTP(parameters)
 end
+
+
+
+local collector = TTTStatistics:new(nil)
+
+-- //////   [ hooks  ]   //////
+-- Hooks need to be defined down here to make sure that the functions are in the scope
+-- NOTE: that the hooks need to return nil or nothing to propate propably through
+gameevent.Listen("player_connect")
+gameevent.Listen("player_disconnect")
+hook.Add('Initialize', 'TTTStatisticsInitializeFile', function() collector:Initialize() end)
+hook.Add('PlayerInitialSpawn', 'TTTStatisticsPlayerJoin', function(ply) collector:PlayerJoin(ply) end)
+hook.Add('WeaponEquip', 'TTTStatisticsWeaponEquip', function(item, ply) collector:ItemPickedUp(item, ply) end)
+hook.Add('TTTPrepareRound', 'TTTStatisticsRoundPrepare', function()  collector:PrepareRound() end)
+hook.Add('TTTBeginRound', 'TTTStatisticsRoundBegin', function() collector:RoundBegin() end)
+hook.Add('TTTEndRound', 'TTTStatisticsRoundEnd', function(result) collector:RoundEnd(result) end)
+hook.Add('TTTOrderedEquipment', 'TTTStatisticsEquipmentBought', function(ply, item, is_item) collector:EquipmentBought(ply, item, is_item) end)
+hook.Add('TTTFoundDNA', 'TTTStatisticsFoundDNA', function(ply, dna, ent) collector:FoundDNA(ply, dna, ent) end)
+hook.Add("EntityTakeDamage", "TTTStatisticsPlayerHurt", function(target, dmgInfo) collector:PlayerTakesDamage(target, dmgInfo) end)
+hook.Add('PlayerDeath', 'TTTStatisticsPlayerWasKilled', function(v, i, attacker) collector:PlayerDied(v, i, attacker) end)
+hook.Add('player_disconnect', 'TTTStatisticsPlayerDisconnect', function(ply) collector:PlayerDisconnect(ply) end)
+hook.Add('ShutDown', 'TTTStatisticsServerShuttingDown', function() collector:ServerClose() end)
+hook.Add(GMSTAT_HOOK, GMSTAT_HOOKID, AsyncRequest)
+-- hook.Add("PlayerSpawn", "TTTStatisticsPlayerSpawn", collector:Spawn)
+-- hook.Add('UsedDefib', 'TTTStatisticsUserWasRevived', DefibRevive)
+-- hook.Add('TTTCanSearchCorpse', 'TTTStatisticsCorpseSearchedExample', CorpseSearch) This hook is being weird, regarding identifying of corpse and the confirmed dead table
