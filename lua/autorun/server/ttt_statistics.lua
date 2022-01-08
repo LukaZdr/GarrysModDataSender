@@ -57,7 +57,7 @@ local TTT_STATS_HTTP_METHOD_POST = 'POST'
 local TTT_STATS_HTTP_METHOD_PATCH = 'PATCH'
 local TTT_STATS_HTTP_METHOD_GET = 'GET'
 -- allow to write the data to the database
-local TTT_STATS_DB_PRINT_SUCCESSFUL = true
+local TTT_STATS_DB_PRINT_SUCCESSFUL = false
 
 
 -- Meta Class
@@ -224,7 +224,7 @@ function TTTStatistics:PlayerTakesDamage(target, dmginfo)
           ['steam_id'] = UserIdentifier(target),
           ['health'] = target:Health(),
           ['position'] = VectorToList(target:GetPos()),
-          ['volicity'] = VectorToList(target:GetVelocity()),
+          ['velocity'] = VectorToList(target:GetVelocity()),
           ['ping'] = target:Ping(),
 
       },
@@ -495,7 +495,6 @@ function TTTStatistics:RoundEnd(result)
 
   self.roundid = "preparing" -- GLOBAL VARIALE which propegate the round id of the current run
   self:Request(TTT_STATS_HTTP_METHOD_PATCH, '/api/v1/round', action_table)
-  self:RoundOver()
 end
 
 -- CorpseSearch
@@ -577,12 +576,12 @@ function TTTStatistics:RoundOver()
   local roundid = self.roundid
   local action_table = {
    ['roundid'] = roundid,
-   ['action'] = 'round prepare',
+   ['action'] = 'round over',
    ['outcome'] = 'round over',
    ['time'] = EpochTime(),
    ['map'] = game.GetMap()
   }
-  self.Request(TTT_STATS_HTTP_METHOD_POST, ' /api/v1/round/over', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/round/over', action_table)
 end
 
 
@@ -647,8 +646,8 @@ end
 
 -- [ Request ]
 
-GMSTAT_HOOK="GMSTATISTIC_MAKE_REQUEST"
-GMSTAT_HOOKID="GMSTATISTIC_MAKE_REQUESTID"
+GMSTAT_HOOK="TTTSTATISTIC_MAKE_REQUEST"
+GMSTAT_HOOKID="TTTSTATISTIC_MAKE_REQUESTID"
 
 function TTTStatistics:Request(method, url, body)
   if self.logs then
@@ -700,7 +699,7 @@ hook.Add('PlayerInitialSpawn', 'TTTStatisticsPlayerJoin', function(ply) collecto
 hook.Add('WeaponEquip', 'TTTStatisticsWeaponEquip', function(item, ply) collector:ItemPickedUp(item, ply) end)
 hook.Add('TTTPrepareRound', 'TTTStatisticsRoundPrepare', function()  collector:PrepareRound() end)
 hook.Add('TTTBeginRound', 'TTTStatisticsRoundBegin', function() collector:RoundBegin() end)
-hook.Add('TTTEndRound', 'TTTStatisticsRoundEnd', function(result) collector:RoundEnd(result) end)
+hook.Add('TTTEndRound', 'TTTStatisticsRoundEnd', function(result) collector:RoundEnd(result);   collector:RoundOver() end)
 hook.Add('TTTOrderedEquipment', 'TTTStatisticsEquipmentBought', function(ply, item, is_item) collector:EquipmentBought(ply, item, is_item) end)
 hook.Add('TTTFoundDNA', 'TTTStatisticsFoundDNA', function(ply, dna, ent) collector:FoundDNA(ply, dna, ent) end)
 hook.Add("EntityTakeDamage", "TTTStatisticsPlayerHurt", function(target, dmgInfo) collector:PlayerTakesDamage(target, dmgInfo) end)
