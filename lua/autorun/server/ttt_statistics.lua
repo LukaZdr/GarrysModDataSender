@@ -31,7 +31,6 @@ https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/base/game
 
 
 --[ GLOBALS ]
--- We know globals are bad code, but we didnt see a better way to achieve this which was simple enough
 
 -- //////   [ File DB Flags ]   //////
 --    Flag to allow game logs to  be written
@@ -44,8 +43,6 @@ local TTT_STATS_WRITE_TO_DB = true
 --    filename will be "session" followed by the timestamp in YEARMONTHDAYHOURMINUTE
 local TTT_STATS_FOLDER_NAME = "ttt_statistics"
 --    global variable which will be written over by the Initialize Hook
---    points to the current file to which the logs will be written to
-local TTT_STATS_SESSION_FILE=""
 
 
 
@@ -394,114 +391,11 @@ function TTTStatistics:ItemPickedUp(weapon, ply)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/items/pickup', action_table)
 end
 
-
--- RoundBegin
--- Logs the event of a new round begin
--- Gathers the information for a new round 
-function TTTStatistics:RoundBegin()
-  local spectators_list = {}
-  local traitors_list = {}
-  local detectives_list = {}
-  local innocents_list = {}
-
-  for _, ply in pairs(player.GetAll()) do
-    local user = {
-      ['steam_id'] = UserIdentifier(ply),
-      ['karma'] = ply:GetLiveKarma(),
-      ['stats'] = {
-        ["score"] = ply:Frags(),
-        ["deaths"] = ply:Deaths(),
-      },
-      ['credits'] = ply:GetCredits(),
-      ['ping'] = ply:Ping()
-    }
-    if ply:IsSpec() then
-      spectators_list = table.ForceInsert(spectators_list, user) -- spectator roles are also innocent thats the wroason for this workaround
-    elseif ply:IsTraitor() then
-      traitors_list = table.ForceInsert(traitors_list, user)
-    elseif ply:IsActiveDetective() then
-      detectives_list = table.ForceInsert(detectives_list, user)
-    else
-      innocents_list = table.ForceInsert(innocents_list, user)
-    end
-  end
-
-  
-  self.roundid = tostring(EpochTime())
-  local roundid = self.roundid
-  local action_table = {
-    ['roundid'] = roundid,
-    ['action'] = 'round start',
-    ['time'] = EpochTime(),
-    ['traitors'] = traitors_list,
-    ['detectives'] = detectives_list,
-    ['innocents'] = innocents_list,
-    ['spectators'] = spectators_list,
-    ['map'] = game.GetMap()
-  }
-  self:Request(TTT_STATS_HTTP_METHOD_POST, ' /api/v1/round', action_table)
-end
-
-
--- RoundEnd
--- Logs the event of a round end
--- Gathers the information of end round
-function TTTStatistics:RoundEnd(result)
-  local action = 'round end'
-  win_reason = ''
-  if result == WIN_TRAITOR then
-    win_reason = 'win_traitor'
-  elseif result == WIN_INNOCENT then
-    win_reason = 'win_innocent'
-  else
-    win_reason = 'win_timelimit'
-  end
-
-  local dead = {}
-  local alive = {}
-
-  for _, ply in pairs(player.GetAll()) do
-    local user = {
-      ['steam_id'] = UserIdentifier(ply),
-      ['karma'] = ply:GetLiveKarma(),
-      ['stats'] = {
-        ["score"] = ply:Frags(),  -- score on the other hand is importatnt since it can reach negative values (would flatten this also)
-        ["deaths"] = ply:Deaths(),  -- wouldn't like to save deaths here since we get it from the round actions
-      },
-      ['credits'] = ply:GetCredits(),
-      ['ping'] = ply:Ping(),
-      ['role'] = ply:GetRoleString()
-    }
-
-    if ply:Alive()
-    then
-      alive = table.ForceInsert(alive, user)
-    else
-      dead = table.ForceInsert(dead, user)
-    end
-  end
-
-  local roundid = self.roundid -- maybe obstructed by racing condition
-  local action_table = {
-    ['roundid'] = roundid,
-    ['action'] = action,
-    ['time'] = EpochTime(),
-    ['reason'] = win_reason,
-    ['result'] = {
-      ["dead"] = dead,
-      ["survived"] = alive
-    }
-  }
-
-  self.roundid = "preparing" -- GLOBAL VARIALE which propegate the round id of the current run
-  self:Request(TTT_STATS_HTTP_METHOD_PATCH, '/api/v1/round', action_table)
-end
-
 -- CorpseSearch
 -- Logs the event of a CorpseSearch
 -- Gathers the information CorpseSearch note that here there is a requirement of if the corpse can be searched
 function TTTStatistics:CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
-  if not ply:IsActive() then return true end
+  if not ply:IsActive() or ply:IsBot() then return true end
 
   local action = 'corpse searched'
   local roundid = self.roundid
@@ -565,24 +459,112 @@ function TTTStatistics:PrepareRound()
    ['time'] = EpochTime(),
    ['map'] = game.GetMap()
   }
-  self:Request(TTT_STATS_HTTP_METHOD_POST, ' /api/v1/round/prepare', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, ' /api/v1/round', action_table)
 end
 
--- RoundOver
--- Logs the event of a RoundOver
--- Gathers the information RoundOver
-function TTTStatistics:RoundOver()
-  self.roundid = tostring(EpochTime())
+
+
+-- RoundBegin
+-- Logs the event of a new round begin
+-- Gathers the information for a new round 
+function TTTStatistics:RoundBegin()
+  local spectators_list = {}
+  local traitors_list = {}
+  local detectives_list = {}
+  local innocents_list = {}
+
+  for _, ply in pairs(player.GetAll()) do
+    local user = {
+      ['steam_id'] = UserIdentifier(ply),
+      ['karma'] = ply:GetLiveKarma(),
+      ['stats'] = {
+        ["score"] = ply:Frags(),
+        ["deaths"] = ply:Deaths(),
+      },
+      ['credits'] = ply:GetCredits(),
+      ['ping'] = ply:Ping()
+    }
+    if ply:IsSpec() then
+      spectators_list = table.ForceInsert(spectators_list, user) -- spectator roles are also innocent thats the wroason for this workaround
+    elseif ply:IsTraitor() then
+      traitors_list = table.ForceInsert(traitors_list, user)
+    elseif ply:IsActiveDetective() then
+      detectives_list = table.ForceInsert(detectives_list, user)
+    else
+      innocents_list = table.ForceInsert(innocents_list, user)
+    end
+  end
+
+  
   local roundid = self.roundid
   local action_table = {
-   ['roundid'] = roundid,
-   ['action'] = 'round over',
-   ['outcome'] = 'round over',
-   ['time'] = EpochTime(),
-   ['map'] = game.GetMap()
+    ['roundid'] = roundid,
+    ['action'] = 'round start',
+    ['time'] = EpochTime(),
+    ['traitors'] = traitors_list,
+    ['detectives'] = detectives_list,
+    ['innocents'] = innocents_list,
+    ['spectators'] = spectators_list,
+    ['map'] = game.GetMap()
   }
+  self:Request(TTT_STATS_HTTP_METHOD_PATCH, ' /api/v1/round', action_table)
+end
+
+
+-- RoundEnd
+-- Logs the event of a round end
+-- Gathers the information of end round
+function TTTStatistics:RoundEnd(result)
+  local action = 'round end'
+  win_reason = ''
+  if result == WIN_TRAITOR then
+    win_reason = 'win_traitor'
+  elseif result == WIN_INNOCENT then
+    win_reason = 'win_innocent'
+  else
+    win_reason = 'win_timelimit'
+  end
+
+  local dead = {}
+  local alive = {}
+
+  for _, ply in pairs(player.GetAll()) do
+    local user = {
+      ['steam_id'] = UserIdentifier(ply),
+      ['karma'] = ply:GetLiveKarma(),
+      ['stats'] = {
+        ["score"] = ply:Frags(),    -- score on the other hand is important since it can reach negative values (would flatten this also)
+        ["death"] = ply:Deaths(),   -- wouldn't like to save deaths here since we get it from the round actions
+      },
+      ['credits'] = ply:GetCredits(),
+      ['ping'] = ply:Ping(),
+      ['role'] = ply:GetRoleString()
+    }
+
+    if ply:Alive()
+    then
+      alive = table.ForceInsert(alive, user)
+    else
+      dead = table.ForceInsert(dead, user)
+    end
+  end
+
+  local roundid = self.roundid -- maybe obstructed by racing condition
+  local action_table = {
+    ['roundid'] = roundid,
+    ['action'] = action,
+    ['time'] = EpochTime(),
+    ['reason'] = win_reason,
+    ['result'] = {
+      ["dead"] = dead,
+      ["survived"] = alive
+    }
+  }
+
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/round/over', action_table)
 end
+
+
 
 
 
@@ -699,7 +681,7 @@ hook.Add('PlayerInitialSpawn', 'TTTStatisticsPlayerJoin', function(ply) collecto
 hook.Add('WeaponEquip', 'TTTStatisticsWeaponEquip', function(item, ply) collector:ItemPickedUp(item, ply) end)
 hook.Add('TTTPrepareRound', 'TTTStatisticsRoundPrepare', function()  collector:PrepareRound() end)
 hook.Add('TTTBeginRound', 'TTTStatisticsRoundBegin', function() collector:RoundBegin() end)
-hook.Add('TTTEndRound', 'TTTStatisticsRoundEnd', function(result) collector:RoundEnd(result);   collector:RoundOver() end)
+hook.Add('TTTEndRound', 'TTTStatisticsRoundEnd', function(result) collector:RoundEnd(result);  end)
 hook.Add('TTTOrderedEquipment', 'TTTStatisticsEquipmentBought', function(ply, item, is_item) collector:EquipmentBought(ply, item, is_item) end)
 hook.Add('TTTFoundDNA', 'TTTStatisticsFoundDNA', function(ply, dna, ent) collector:FoundDNA(ply, dna, ent) end)
 hook.Add("EntityTakeDamage", "TTTStatisticsPlayerHurt", function(target, dmgInfo) collector:PlayerTakesDamage(target, dmgInfo) end)
@@ -708,5 +690,8 @@ hook.Add('player_disconnect', 'TTTStatisticsPlayerDisconnect', function(ply) col
 hook.Add('ShutDown', 'TTTStatisticsServerShuttingDown', function() collector:ServerClose() end)
 hook.Add(GMSTAT_HOOK, GMSTAT_HOOKID, AsyncRequest)
 -- hook.Add("PlayerSpawn", "TTTStatisticsPlayerSpawn", collector:Spawn)
--- hook.Add('UsedDefib', 'TTTStatisticsUserWasRevived', DefibRevive)
--- hook.Add('TTTCanSearchCorpse', 'TTTStatisticsCorpseSearchedExample', CorpseSearch) This hook is being weird, regarding identifying of corpse and the confirmed dead table
+hook.Add('UsedDefib', 'TTTStatisticsUserWasRevived',  function(revive) collector:DefibRevive(revive) end)
+hook.Add('TTTCanSearchCorpse', 'TTTStatisticsCorpseSearchedExample', 
+function(ply, corpse, is_covert, is_long_range, was_traitor) 
+  collector:CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
+  end)
