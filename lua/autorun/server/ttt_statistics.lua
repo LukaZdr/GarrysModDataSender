@@ -38,6 +38,12 @@ local TTT_STATS_WRITING_LOGS = true
 --    Flag to allow game to send the logs to the host via http
 local TTT_STATS_WRITE_TO_DB = true
 
+local TTT_DUMP_AT_END = true
+
+local SERVER_START_TIME = os.time() * 1000
+
+
+
 --  //////   [ File IO Flags ]   //////
 --    Foldername where statistics will be written to
 --    filename will be "session" followed by the timestamp in YEARMONTHDAYHOURMINUTE
@@ -57,6 +63,67 @@ local TTT_STATS_HTTP_METHOD_GET = 'GET'
 local TTT_STATS_DB_PRINT_SUCCESSFUL = false
 
 
+--[=====[
+  PrepareRound:  {
+   ['roundid'] = roundid,
+   ['action'] = 'round prepare',
+   ['outcome'] = 'preparing',
+   ['time'] = EpochTime(),
+   ['map'] = game.GetMap()
+  }
+
+  start: {
+    ['roundid'] = roundid,
+    ['action'] = 'round start',
+    ['time'] = EpochTime(),
+    ['traitors'] = traitors_list,
+    ['detectives'] = detectives_list,
+    ['innocents'] = innocents_list,
+    ['spectators'] = spectators_list,
+    ['map'] = game.GetMap()
+  }
+
+  actions {
+    PlayerTakesDamages []
+    PlayerDieds []
+    EquipmentBoughts[]
+    ItemPickedUps []
+    CorpseSearchs []
+    FoundDNAs[]
+  }
+
+  end: {
+    ['roundid'] = roundid,
+    ['action'] = action,
+    ['time'] = EpochTime(),
+    ['reason'] = win_reason,
+    ['result'] = {
+      ["dead"] = dead,
+      ["survived"] = alive
+    }
+  }
+
+--]=====]
+
+function NewBuffer()
+  return {
+    ['action'] = "round dump",
+    ['prepare']= nil,
+    ['start']= nil,
+    ['actions']= {
+      ['playertakesdamages']= {},
+      ['playerdieds']= {},
+      ['equipmentboughts']= {},
+      ['itempickedups']= {},
+      ['corpsecearchs']= {},
+      ['founddnas']= {},
+      ['defibrevives']= {},
+    },
+    ['end']= nil,
+  }
+end
+
+
 -- Meta Class
 local TTTStatistics = { roundid = "preparing", folderpath = TTT_STATS_FOLDER_NAME, file = ""}
 
@@ -66,10 +133,13 @@ function TTTStatistics:new(t)
   self.__index = self
   self.roundid = "preparing"
   self.logs = TTT_STATS_WRITING_LOGS
+  self.dump = TTT_DUMP_AT_END
   self.db = TTT_STATS_WRITE_TO_DB
   self.folderpath = TTT_STATS_FOLDER_NAME
   self.dbLogSuccess = TTT_STATS_DB_PRINT_SUCCESSFUL
+  self.buffer = nil
   self.file = ""
+  self.token = "mytoken"
   return tt
 end
 
@@ -134,7 +204,7 @@ function TTTStatistics:ServerStart()
     ['time'] = EpochTime(),
     ['map'] = game.GetMap()
   }
-  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/server', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/server', action_table, true)
 end
 
 
@@ -146,7 +216,7 @@ function TTTStatistics:ServerClose()
     ['action'] = action,
     ['time'] = EpochTime()
   }
-  self:Request(TTT_STATS_HTTP_METHOD_PATCH, '/api/v1/server', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_PATCH, '/api/v1/server', action_table, true)
 end
 
 -- PlayerJoins
@@ -159,7 +229,9 @@ function TTTStatistics:PlayerJoin(ply)
     ['user'] = user_info,
     ['time'] = EpochTime()
   }
-  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/connect', action_table)
+
+  
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/connect', action_table, true)
 end
 
 -- PlayerJoins
@@ -176,7 +248,7 @@ function TTTStatistics:PlayerDisconnect(data)
     ['user'] =  user,
     ['time'] = EpochTime()
   }
-  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/disconnect', action_table)
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/disconnect', action_table, true)
 end
 
 -- PlayerTakesDamage
@@ -267,6 +339,7 @@ function TTTStatistics:PlayerTakesDamage(target, dmginfo)
     ['time'] = EpochTime()
   }
 
+  self.buffer.actions.playertakesdamages = table.ForceInsert(self.buffer.actions.playertakesdamages, action_table)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/damage', action_table)
 end
 
@@ -325,6 +398,7 @@ function TTTStatistics:PlayerDied(victimPlayer, inflictorEntity, attackerEntity)
     ['time'] = EpochTime()
   }
 
+  self.buffer.actions.playerdieds = table.ForceInsert(self.buffer.actions.playerdieds, action_table)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/killed', action_table)
 end
 
@@ -337,6 +411,8 @@ function TTTStatistics:DefibRevive(reviver)
     ['revived'] = UserIdentifier(last_respawned),
     ['time'] = EpochTime()
   }
+
+  self.buffer.actions.defibrevives = table.ForceInsert(self.buffer.actions.defibrevives, action_table)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/revive', action_table)
 end
 
@@ -366,6 +442,7 @@ function TTTStatistics:EquipmentBought(ply, equipment, is_item)
     ['item'] = nameOfItem,
     ['time'] = EpochTime()
   }
+  self.buffer.actions.equipmentboughts = table.ForceInsert(self.buffer.actions.equipmentboughts, action_table)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/items/bought', action_table)
 end
 
@@ -378,6 +455,7 @@ function TTTStatistics:ItemPickedUp(weapon, ply)
     return -- return nil to allow propegation of all the other hooks
   end
 
+
   local action = 'item pickup'
   local roundid = self.roundid
   local action_table = {
@@ -388,6 +466,8 @@ function TTTStatistics:ItemPickedUp(weapon, ply)
     ['ping'] = ply:Ping(),
     ['time'] = EpochTime()
   }
+
+    self.buffer.actions.itempickedups = table.ForceInsert(self.buffer.actions.itempickedups, action_table)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/items/pickup', action_table)
 end
 
@@ -409,6 +489,8 @@ function TTTStatistics:CorpseSearch(ply, corpse, is_covert, is_long_range, was_t
     ['corpse_was_traitor'] = was_traitor,
     ['time'] = EpochTime()
   }
+
+  self.buffer.actions.corpsecearchs = table.ForceInsert(self.buffer.actions.corpsecearchs, action_table)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/search/corpse', action_table)
 end
 
@@ -436,6 +518,8 @@ function TTTStatistics:FoundDNA(ply,dna_owner, ent)
     ['is_prop'] = isProp,
     ['time'] = EpochTime()
   }
+
+  self.buffer.actions.founddnas = table.ForceInsert(self.buffer.actions.founddnas, action_table)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/search/dna', action_table)
 end
 
@@ -459,7 +543,11 @@ function TTTStatistics:PrepareRound()
    ['time'] = EpochTime(),
    ['map'] = game.GetMap()
   }
-  self:Request(TTT_STATS_HTTP_METHOD_POST, ' /api/v1/round', action_table)
+
+
+  self.buffer = NewBuffer()
+  self.buffer.prepare = action_table
+  self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/round', action_table)
 end
 
 
@@ -507,7 +595,9 @@ function TTTStatistics:RoundBegin()
     ['spectators'] = spectators_list,
     ['map'] = game.GetMap()
   }
-  self:Request(TTT_STATS_HTTP_METHOD_PATCH, ' /api/v1/round', action_table)
+
+  self.buffer.start = action_table
+  self:Request(TTT_STATS_HTTP_METHOD_PATCH, '/api/v1/round', action_table)
 end
 
 
@@ -561,6 +651,8 @@ function TTTStatistics:RoundEnd(result)
     }
   }
 
+  self.buffer['end'] = action_table
+  self:Dump()
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/round/over', action_table)
 end
 
@@ -596,6 +688,10 @@ function GetDMGTypesStr(flag)
 end
 
 function UserIdentifier(user)
+  if (user:SteamID() == "BOT") then
+    return user:SteamID()  .. "_" .. user:GetName()
+  end
+
   return user:SteamID()
 end
 
@@ -610,10 +706,14 @@ end
 
 
 function TTTStatistics:Log(table)
+  if self.file == "" then
+    self.file =  "session_" .. os.date("%Y%m%d%H%M", os.time()) .. ".txt"
+  end
+
   file.CreateDir(self.folderpath)
   local json = util.TableToJSON(table)
-  local string = json .. '\n'
-  file.Append(self.folderpath .. "/" .. self.file, string)
+  local ss = json .. '\n'
+  file.Append(self.folderpath .. "/" .. self.file, ss)
 end
 
 -- split a string by its separator into a list
@@ -623,7 +723,11 @@ end
 
 
 function EpochTime()
-  return util.NiceFloat(os.time())
+  local rawTimeResult = util.NiceFloat(SERVER_START_TIME + RealTime() * 1000)
+
+  local beg, index = string.find(rawTimeResult, "[.]")
+  local result =  string.sub(rawTimeResult, 0, index-1)
+  return result
 end
 
 -- [ Request ]
@@ -631,15 +735,41 @@ end
 GMSTAT_HOOK="TTTSTATISTIC_MAKE_REQUEST"
 GMSTAT_HOOKID="TTTSTATISTIC_MAKE_REQUESTID"
 
-function TTTStatistics:Request(method, url, body)
+function TTTStatistics:Request(method, url, body, force)
   if self.logs then
     self:Log(table.Copy(body))
   end
 
-  if self.db then
-    hook.Call(GMSTAT_HOOK, GMSTAT_HOOKID, method, url, body, "my_auth_token")
+  if force == nil then 
+    force = false
+  end
+
+  if !force and self.dump then
+      return 
+  end
+
+  if self.db and force then
+    hook.Call(GMSTAT_HOOK, GMSTAT_HOOKID, method, url, body, self.token)
   end
 end
+
+
+function TTTStatistics:Dump()
+  if self.buffer == nil then
+    return 
+  end
+
+  if self.dump then
+    if self.logs then
+      self:Log(table.Copy(self.buffer))
+    end
+
+    if self.db  then
+      hook.Call(GMSTAT_HOOK, GMSTAT_HOOKID, TTT_STATS_HTTP_METHOD_POST, "/api/v1/round/dump", self.buffer, self.token)
+    end
+  end
+end
+
 
 function AsyncRequest(method, url, body, token)
   local json = util.TableToJSON(body)
