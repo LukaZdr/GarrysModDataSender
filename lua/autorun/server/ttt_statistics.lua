@@ -37,7 +37,7 @@ https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/base/game
 local TTT_STATS_WRITING_LOGS = true
 --    Flag to allow game to send the logs to the host via http
 local TTT_STATS_WRITE_TO_DB = true
-
+-- instead of writing directly to db host, accumulate round info and send it after round is over
 local TTT_DUMP_AT_END = true
 
 local SERVER_START_TIME = os.time() * 1000
@@ -801,27 +801,65 @@ end
 
 local collector = TTTStatistics:new(nil)
 
--- //////   [ hooks  ]   //////
+
+function CalcDistance(ply, cmd, args, argsAsString ) 
+  if ply == nil then
+    return 
+  end
+
+    if  args == nil or args[1] == nil then
+      print("Needs valid args, [PlayerName] -- matches first player with this name")
+      return 
+    end
+
+    for _, other in pairs(player.GetAll()) do
+      if other:GetName() == args[1] then
+        local posTarget = other:GetPos()
+        local posPlayer = ply:GetPos()
+        local px = (posTarget.x - posPlayer.x) ^ 2
+        local py = (posTarget.y - posPlayer.y) ^ 2
+        local pz = (posTarget.z - posPlayer.z) ^ 2
+
+        local result = (math.sqrt(px + py + pz)) /50
+        print("Distance between " .. ply:GetName() .. " and " .. other:GetName() .. " is " .. util.NiceFloat(result) .. "m") 
+        return 
+      end 
+    end
+    print("Player \"" .. args[1] .. "\" not found")
+
+end
+
+
+  -- //////   [ hooks  ]   //////
 -- Hooks need to be defined down here to make sure that the functions are in the scope
 -- NOTE: that the hooks need to return nil or nothing to propate propably through
-gameevent.Listen("player_connect")
-gameevent.Listen("player_disconnect")
-hook.Add('Initialize', 'TTTStatisticsInitializeFile', function() collector:Initialize() end)
-hook.Add('PlayerInitialSpawn', 'TTTStatisticsPlayerJoin', function(ply) collector:PlayerJoin(ply) end)
-hook.Add('WeaponEquip', 'TTTStatisticsWeaponEquip', function(item, ply) collector:ItemPickedUp(item, ply) end)
-hook.Add('TTTPrepareRound', 'TTTStatisticsRoundPrepare', function()  collector:PrepareRound() end)
-hook.Add('TTTBeginRound', 'TTTStatisticsRoundBegin', function() collector:RoundBegin() end)
-hook.Add('TTTEndRound', 'TTTStatisticsRoundEnd', function(result) collector:RoundEnd(result);  end)
-hook.Add('TTTOrderedEquipment', 'TTTStatisticsEquipmentBought', function(ply, item, is_item) collector:EquipmentBought(ply, item, is_item) end)
-hook.Add('TTTFoundDNA', 'TTTStatisticsFoundDNA', function(ply, dna, ent) collector:FoundDNA(ply, dna, ent) end)
-hook.Add("EntityTakeDamage", "TTTStatisticsPlayerHurt", function(target, dmgInfo) collector:PlayerTakesDamage(target, dmgInfo) end)
-hook.Add('PlayerDeath', 'TTTStatisticsPlayerWasKilled', function(v, i, attacker) collector:PlayerDied(v, i, attacker) end)
-hook.Add('player_disconnect', 'TTTStatisticsPlayerDisconnect', function(ply) collector:PlayerDisconnect(ply) end)
-hook.Add('ShutDown', 'TTTStatisticsServerShuttingDown', function() collector:ServerClose() end)
-hook.Add(GMSTAT_HOOK, GMSTAT_HOOKID, AsyncRequest)
--- hook.Add("PlayerSpawn", "TTTStatisticsPlayerSpawn", collector:Spawn)
-hook.Add('UsedDefib', 'TTTStatisticsUserWasRevived',  function(revive) collector:DefibRevive(revive) end)
-hook.Add('TTTCanSearchCorpse', 'TTTStatisticsCorpseSearchedExample', 
-function(ply, corpse, is_covert, is_long_range, was_traitor) 
-  collector:CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
+
+
+function CollectData()
+    print("TTTStatistics:: hooks ready")
+    concommand.Add( "tttstatistics_print_distance", CalcDistance)
+    gameevent.Listen("player_connect")
+    gameevent.Listen("player_disconnect")
+    hook.Add('Initialize', 'TTTStatisticsInitializeFile', function() collector:Initialize() end)
+    hook.Add('PlayerInitialSpawn', 'TTTStatisticsPlayerJoin', function(ply) collector:PlayerJoin(ply) end)
+    hook.Add('WeaponEquip', 'TTTStatisticsWeaponEquip', function(item, ply) collector:ItemPickedUp(item, ply) end)
+    hook.Add('TTTPrepareRound', 'TTTStatisticsRoundPrepare', function()  collector:PrepareRound() end)
+    hook.Add('TTTBeginRound', 'TTTStatisticsRoundBegin', function() collector:RoundBegin() end)
+    hook.Add('TTTEndRound', 'TTTStatisticsRoundEnd', function(result) collector:RoundEnd(result);  end)
+    hook.Add('TTTOrderedEquipment', 'TTTStatisticsEquipmentBought', function(ply, item, is_item) collector:EquipmentBought(ply, item, is_item) end)
+    hook.Add('TTTFoundDNA', 'TTTStatisticsFoundDNA', function(ply, dna, ent) collector:FoundDNA(ply, dna, ent) end)
+    hook.Add("EntityTakeDamage", "TTTStatisticsPlayerHurt", function(target, dmgInfo) collector:PlayerTakesDamage(target, dmgInfo) end)
+    hook.Add('PlayerDeath', 'TTTStatisticsPlayerWasKilled', function(v, i, attacker) collector:PlayerDied(v, i, attacker) end)
+    hook.Add('player_disconnect', 'TTTStatisticsPlayerDisconnect', function(ply) collector:PlayerDisconnect(ply) end)
+    hook.Add('ShutDown', 'TTTStatisticsServerShuttingDown', function() collector:ServerClose() end)
+    hook.Add(GMSTAT_HOOK, GMSTAT_HOOKID, AsyncRequest)
+    -- hook.Add("PlayerSpawn", "TTTStatisticsPlayerSpawn", collector:Spawn)
+    hook.Add('UsedDefib', 'TTTStatisticsUserWasRevived',  function(revive) collector:DefibRevive(revive) end)
+    hook.Add('TTTCanSearchCorpse', 'TTTStatisticsCorpseSearchedExample', 
+  function(ply, corpse, is_covert, is_long_range, was_traitor) 
+    collector:CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
   end)
+end 
+
+-- Only call mod if Trouble in Terrorist Town is active
+gamemode.Call("Trouble in Terrorist Town", CollectData())
