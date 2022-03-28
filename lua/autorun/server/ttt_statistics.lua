@@ -236,11 +236,12 @@ end
 
 -- PlayerJoins
 -- Logs the event of a player disconnecting from the server which includes
-function TTTStatistics:PlayerDisconnect(data)
+function TTTStatistics:PlayerDisconnect(ply)
   local action = 'player disconnect'
+  local plyer = ExtractPlayerTable(ply)
   local user = {
-    ['steam_id'] = data.networkid,
-    ['name'] =  data.name,
+    ['steam_id'] = plyer.steam_id,
+    ['name'] =  plyer.name,
     ['reason'] =  data.reason
   }
   local action_table = {
