@@ -31,12 +31,17 @@ https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/base/game
 
 
 --[ GLOBALS ]
-
 -- //////   [ File DB Flags ]   //////
 --    Flag to allow game logs to  be written
-local TTT_STATS_WRITING_LOGS = true
+local TTT_STATS_WRITING_LOGS = CreateConVar("tttstatistics_write_logs", "0", FCVAR_CHEAT,  "Enable write logs to file", 0, 1 )
 --    Flag to allow game to send the logs to the host via http
-local TTT_STATS_WRITE_TO_DB = true
+local TTT_STATS_HOST = CreateConVar("tttstatistics_url", "", FCVAR_CHEAT,  "Enable write logs to host", nil, nil )
+local TTT_STATS_WRITE_TO_DB = CreateConVar("tttstatistics_write_db", "0", FCVAR_CHEAT, "Enable write log to api", 0, 1 )
+local TTT_STATS_DB_PRINT_SUCCESSFUL = CreateConVar("tttstatistics_debug", "0", FCVAR_CHEAT,  "Enable debug", 0, 1 ) 
+local TTT_STATISTICS_TOKEN = CreateConVar("tttstatistics_token", "", FCVAR_CHEAT, "Set token as header", nil, nil )
+
+
+
 -- instead of writing directly to db host, accumulate round info and send it after round is over
 local TTT_DUMP_AT_END = true
 
@@ -51,16 +56,15 @@ local TTT_STATS_FOLDER_NAME = "ttt_statistics"
 --    global variable which will be written over by the Initialize Hook
 
 
-
 -- //////   [ File DB Flags ]   //////
 -- Host to send the data to
-local TTT_STATS_HOST="http://testpost.gmod:8080"
+
 -- Http Methods as globals which need to be uppercase
 local TTT_STATS_HTTP_METHOD_POST = 'POST'
 local TTT_STATS_HTTP_METHOD_PATCH = 'PATCH'
 local TTT_STATS_HTTP_METHOD_GET = 'GET'
 -- allow to write the data to the database
-local TTT_STATS_DB_PRINT_SUCCESSFUL = false
+
 
 
 --[=====[
@@ -132,14 +136,14 @@ function TTTStatistics:new(t)
   tt =  setmetatable(tt, self)
   self.__index = self
   self.roundid = "preparing"
-  self.logs = TTT_STATS_WRITING_LOGS
+  self.logs = TTT_STATS_WRITING_LOGS:GetInt() > 0 
   self.dump = TTT_DUMP_AT_END
-  self.db = TTT_STATS_WRITE_TO_DB
+  self.db = TTT_STATS_WRITE_TO_DB:GetInt() > 0 
   self.folderpath = TTT_STATS_FOLDER_NAME
-  self.dbLogSuccess = TTT_STATS_DB_PRINT_SUCCESSFUL
+  self.dbLogSuccess = TTT_STATS_DB_PRINT_SUCCESSFUL:GetInt() > 0
   self.buffer = nil
   self.file = ""
-  self.token = "mytoken"
+  self.token = TTT_STATISTICS_TOKEN:GetString() 
   return tt
 end
 
@@ -278,7 +282,7 @@ function TTTStatistics:PlayerTakesDamage(target, dmginfo)
     if inflictor:IsPlayer() then
       -- if inflictor is player we know that a hand held weapon is used.
       ply = inflictor
-      weapon_used = util.WeaponFromDamage(dmginfo):GetClass()
+      weapon_used =  GetWeaponName(util.WeaponFromDamage(dmginfo))
     else
       -- if inflictor is ent(weapon/item) damage maybe from item
       ply = dmginfo:GetAttacker()
@@ -368,7 +372,7 @@ function TTTStatistics:PlayerDied(victimPlayer, inflictorEntity, attackerEntity)
 
   if IsValid(inflictorEntity) then
     if inflictorEntity:IsWeapon() then
-      cause = inflictorEntity:GetClass()
+      cause = inflictorEntity:GetPrintName()
     elseif inflictorEntity:IsPlayer() then
       cause = inflictorEntity:SteamID()
     elseif IsEntity(inflictorEntity) then
@@ -698,12 +702,20 @@ end
 
 
 function GetPickUpInfo(pickup)
+  
+  local name = pickup:GetClass()
+  if pickup:IsWeapon() then
+    name = GetWeaponName(pickup)
+  end
   return  {
-    ["name"] = pickup:GetClass(),
+    ["name"] = name,
     ["slot"] = WEPS.TypeForWeapon(pickup:GetClass()), -- pickup slot index
     ["ammo"] = game.GetAmmoName(pickup:GetPrimaryAmmoType()) or "undefined"
   }
 end
+
+
+
 
 
 function TTTStatistics:Log(table)
@@ -737,7 +749,7 @@ GMSTAT_HOOK="TTTSTATISTIC_MAKE_REQUEST"
 GMSTAT_HOOKID="TTTSTATISTIC_MAKE_REQUESTID"
 
 function TTTStatistics:Request(method, url, body, force)
-  if self.logs then
+  if TTT_STATS_WRITING_LOGS:GetInt() > 0  then
     self:Log(table.Copy(body))
   end
 
@@ -749,8 +761,8 @@ function TTTStatistics:Request(method, url, body, force)
       return 
   end
 
-  if self.db and force then
-    hook.Call(GMSTAT_HOOK, GMSTAT_HOOKID, method, url, body, self.token)
+  if TTT_STATS_WRITE_TO_DB:GetInt() > 0  and force then
+    hook.Call(GMSTAT_HOOK, GMSTAT_HOOKID, method, url, body, TTT_STATISTICS_TOKEN:GetString())
   end
 end
 
@@ -761,11 +773,11 @@ function TTTStatistics:Dump()
   end
 
   if self.dump then
-    if self.logs then
+    if TTT_STATS_WRITING_LOGS:GetInt() > 0 then
       self:Log(table.Copy(self.buffer))
     end
 
-    if self.db  then
+    if TTT_STATS_WRITE_TO_DB:GetInt() > 0   then
       hook.Call(GMSTAT_HOOK, GMSTAT_HOOKID, TTT_STATS_HTTP_METHOD_POST, "/api/v1/round/dump", self.buffer, self.token)
     end
   end
@@ -774,7 +786,12 @@ end
 
 function AsyncRequest(method, url, body, token)
   local json = util.TableToJSON(body)
-  url = TTT_STATS_HOST .. url
+  if string.len(TTT_STATS_HOST:GetString()) > 0 then
+    return
+  end
+  
+  
+  url = TTT_STATS_HOST:GetString() .. url
   local parameters = {
     ["failed"] = function (reason)
       error("TTTStatistics: Failed Request: " .. method .. " " ..  url ..": " ..reason)
@@ -803,32 +820,20 @@ end
 local collector = TTTStatistics:new(nil)
 
 
-function CalcDistance(ply, cmd, args, argsAsString ) 
-  if ply == nil then
-    return 
+
+function GetWeaponName(weapon) 
+  if weapon == nil then
+    return "empty"
   end
 
-    if  args == nil or args[1] == nil then
-      print("Needs valid args, [PlayerName] -- matches first player with this name")
-      return 
-    end
+  local name =  weapon:GetPrintName() 
+  if name == "Scripted Weapon" or name == "..." then
+    name = weapon:GetClass()
+  end
 
-    for _, other in pairs(player.GetAll()) do
-      if other:GetName() == args[1] then
-        local posTarget = other:GetPos()
-        local posPlayer = ply:GetPos()
-        local px = (posTarget.x - posPlayer.x) ^ 2
-        local py = (posTarget.y - posPlayer.y) ^ 2
-        local pz = (posTarget.z - posPlayer.z) ^ 2
-
-        local result = (math.sqrt(px + py + pz)) /50
-        print("Distance between " .. ply:GetName() .. " and " .. other:GetName() .. " is " .. util.NiceFloat(result) .. "m") 
-        return 
-      end 
-    end
-    print("Player \"" .. args[1] .. "\" not found")
-
+  return name
 end
+
 
 
   -- //////   [ hooks  ]   //////
@@ -839,6 +844,9 @@ end
 function CollectData()
     print("TTTStatistics:: hooks ready")
     concommand.Add( "tttstatistics_print_distance", CalcDistance)
+    concommand.Add( "tttstatistics_debug", function ()
+    
+    end)
     gameevent.Listen("player_connect")
     gameevent.Listen("player_disconnect")
     hook.Add('Initialize', 'TTTStatisticsInitializeFile', function() collector:Initialize() end)
@@ -861,6 +869,7 @@ function CollectData()
     collector:CorpseSearch(ply, corpse, is_covert, is_long_range, was_traitor)
   end)
 end 
+
 
 -- Only call mod if Trouble in Terrorist Town is active
 gamemode.Call("Trouble in Terrorist Town", CollectData())
