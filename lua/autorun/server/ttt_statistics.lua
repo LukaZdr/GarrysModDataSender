@@ -33,11 +33,11 @@ https://github.com/Facepunch/garrysmod/blob/master/garrysmod/gamemodes/base/game
 --[ GLOBALS ]
 -- //////   [ File DB Flags ]   //////
 --    Flag to allow game logs to  be written
-local TTT_STATS_WRITING_LOGS = CreateConVar("tttstatistics_write_logs", "0", FCVAR_CHEAT,  "Enable write logs to file", 0, 1 )
+local TTT_STATS_WRITING_LOGS = CreateConVar("tttstatistics_write_logs", "1", FCVAR_CHEAT,  "Enable write logs to file", 0, 1 )
 --    Flag to allow game to send the logs to the host via http
-local TTT_STATS_HOST = CreateConVar("tttstatistics_url", "", FCVAR_CHEAT,  "Enable write logs to host", nil, nil )
+local TTT_STATS_HOST = CreateConVar("tttstatistics_url", "http://tttstatistics-rest:3030", FCVAR_CHEAT,  "Enable write logs to host", nil, nil )
 local TTT_STATS_WRITE_TO_DB = CreateConVar("tttstatistics_write_db", "0", FCVAR_CHEAT, "Enable write log to api", 0, 1 )
-local TTT_STATS_DB_PRINT_SUCCESSFUL = CreateConVar("tttstatistics_debug", "0", FCVAR_CHEAT,  "Enable debug", 0, 1 ) 
+local TTT_STATS_DB_PRINT_SUCCESSFUL = CreateConVar("tttstatistics_debug", "1", FCVAR_CHEAT,  "Enable debug", 0, 1 ) 
 local TTT_STATISTICS_TOKEN = CreateConVar("tttstatistics_token", "", FCVAR_CHEAT, "Set token as header", nil, nil )
 
 
@@ -45,9 +45,19 @@ local TTT_STATISTICS_TOKEN = CreateConVar("tttstatistics_token", "", FCVAR_CHEAT
 -- instead of writing directly to db host, accumulate round info and send it after round is over
 local TTT_DUMP_AT_END = true
 
-local SERVER_START_TIME = os.time() * 1000
+-- Epoch Time 
+-- Important 
+local SERVER_START_TIME = os.time()
 
-
+concommand.Add( "print_date", function( ply, cmd, args )
+  -- '2006-01-02T15:04:05.999999999Z07:00'
+  -- '2006-01-02T15:04:05.999.999.999Z07:00'
+  -- os.date("%Y-%m-%dT%X.---"
+  -- os.date("%Y-%m-%dT%X.---"
+  -- os.date("%Y-%m-%dT%X.MS.NS.000Z00:00")
+  local nowDeltaTimeInSeconds = SysTime()  
+  print("Hello", nowDeltaTimeInSeconds)
+end )
 
 --  //////   [ File IO Flags ]   //////
 --    Foldername where statistics will be written to
@@ -111,7 +121,8 @@ local TTT_STATS_HTTP_METHOD_GET = 'GET'
 
 function NewBuffer()
   return {
-    ['action'] = "round dump",
+    ['action'] = "buffer",
+    ['start_time'] = SERVER_START_TIME,
     ['prepare']= nil,
     ['start']= nil,
     ['actions']= {
@@ -143,7 +154,7 @@ function TTTStatistics:new(t)
   self.dbLogSuccess = TTT_STATS_DB_PRINT_SUCCESSFUL:GetInt() > 0
   self.buffer = nil
   self.file = ""
-  self.token = TTT_STATISTICS_TOKEN:GetString() 
+  self.token = TTT_STATISTICS_TOKEN:GetString()
   return tt
 end
 
@@ -193,6 +204,7 @@ local DAMAGE_TYPES = {
  -- Initialize called by the Initialize hook 
  -- Creates a directory under "data" and sets the Session filename to the current timestamp
 function TTTStatistics:Initialize()
+
   self.file = "session_" .. os.date("%Y%m%d%H%M", os.time()) .. ".txt"
   print("TTTStatistics: " , "WRITING_LOGS " , self.logs , " WRITE_TO_DB: " ,  self.db)
   self:ServerStart()
@@ -205,7 +217,8 @@ function TTTStatistics:ServerStart()
   local action = 'server start'
   local action_table = {
     ['action'] = action,
-    ['time'] = EpochTime(),
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
     ['map'] = game.GetMap()
   }
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/server', action_table, true)
@@ -218,7 +231,8 @@ function TTTStatistics:ServerClose()
   local action = "server shutting down"
   local action_table = {
     ['action'] = action,
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
   self:Request(TTT_STATS_HTTP_METHOD_PATCH, '/api/v1/server', action_table, true)
 end
@@ -231,7 +245,8 @@ function TTTStatistics:PlayerJoin(ply)
   local action_table = {
     ['action'] = action,
     ['user'] = user_info,
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
 
   
@@ -251,7 +266,8 @@ function TTTStatistics:PlayerDisconnect(ply)
   local action_table = {
     ['action'] = action,
     ['user'] =  user,
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/player/disconnect', action_table, true)
 end
@@ -341,7 +357,8 @@ function TTTStatistics:PlayerTakesDamage(target, dmginfo)
     ['damage_points'] = damage_info['damage_points'],
     ['damage_type'] = damage_info['damage_type'],
     ['was_headshot'] = damage_info['was_headshot'],
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
 
   self.buffer.actions.playertakesdamages = table.ForceInsert(self.buffer.actions.playertakesdamages, action_table)
@@ -400,7 +417,8 @@ function TTTStatistics:PlayerDied(victimPlayer, inflictorEntity, attackerEntity)
     },
     ['attacker'] = attacker,
     ['cause'] = cause,
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
 
   self.buffer.actions.playerdieds = table.ForceInsert(self.buffer.actions.playerdieds, action_table)
@@ -414,7 +432,8 @@ function TTTStatistics:DefibRevive(reviver)
     ['action'] = 'player revived',
     ['reviver'] = UserIdentifier(reviver),
     ['revived'] = UserIdentifier(last_respawned),
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
 
   self.buffer.actions.defibrevives = table.ForceInsert(self.buffer.actions.defibrevives, action_table)
@@ -445,7 +464,8 @@ function TTTStatistics:EquipmentBought(ply, equipment, is_item)
     ['role'] =  ply:GetRoleString(),
     ['ping'] = ply:Ping(),
     ['item'] = nameOfItem,
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
   self.buffer.actions.equipmentboughts = table.ForceInsert(self.buffer.actions.equipmentboughts, action_table)
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/actions/items/bought', action_table)
@@ -469,7 +489,8 @@ function TTTStatistics:ItemPickedUp(weapon, ply)
     ['steam_id'] = UserIdentifier(ply),
     ['item'] = GetPickUpInfo(weapon),
     ['ping'] = ply:Ping(),
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
 
     self.buffer.actions.itempickedups = table.ForceInsert(self.buffer.actions.itempickedups, action_table)
@@ -492,7 +513,8 @@ function TTTStatistics:CorpseSearch(ply, corpse, is_covert, is_long_range, was_t
     ['is_covert'] = is_covert,
     ['is_long_range'] = is_long_range,
     ['corpse_was_traitor'] = was_traitor,
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
 
   self.buffer.actions.corpsecearchs = table.ForceInsert(self.buffer.actions.corpsecearchs, action_table)
@@ -521,7 +543,8 @@ function TTTStatistics:FoundDNA(ply,dna_owner, ent)
     ['killer'] = UserIdentifier(dna_owner),
     ['victim'] = scanned_ent, -- corpse.sid (user:SteamI()) or equipment name
     ['is_prop'] = isProp,
-    ['time'] = EpochTime()
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
   }
 
   self.buffer.actions.founddnas = table.ForceInsert(self.buffer.actions.founddnas, action_table)
@@ -529,7 +552,7 @@ function TTTStatistics:FoundDNA(ply,dna_owner, ent)
 end
 
 
-function Spawn( ply )
+function Spawn(ply)
   if ply:IsActive() then
     last_respawned = ply
   end
@@ -539,23 +562,20 @@ end
 -- Logs the event of a PrepareRound
 -- Gathers the information PrepareRound
 function TTTStatistics:PrepareRound()
-  self.roundid = tostring(EpochTime())
+  self.roundid = tostring(os.time())
   local roundid = self.roundid
   local action_table = {
    ['roundid'] = roundid,
    ['action'] = 'round prepare',
    ['outcome'] = 'preparing',
-   ['time'] = EpochTime(),
+   ['time'] = SERVER_START_TIME,
+   ['delta_time'] = Now(),
    ['map'] = game.GetMap()
   }
-
-
   self.buffer = NewBuffer()
   self.buffer.prepare = action_table
   self:Request(TTT_STATS_HTTP_METHOD_POST, '/api/v1/round', action_table)
 end
-
-
 
 -- RoundBegin
 -- Logs the event of a new round begin
@@ -593,7 +613,8 @@ function TTTStatistics:RoundBegin()
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = 'round start',
-    ['time'] = EpochTime(),
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
     ['traitors'] = traitors_list,
     ['detectives'] = detectives_list,
     ['innocents'] = innocents_list,
@@ -648,7 +669,8 @@ function TTTStatistics:RoundEnd(result)
   local action_table = {
     ['roundid'] = roundid,
     ['action'] = action,
-    ['time'] = EpochTime(),
+    ['time'] = SERVER_START_TIME,
+    ['delta_time'] = Now(),
     ['reason'] = win_reason,
     ['result'] = {
       ["dead"] = dead,
@@ -714,10 +736,6 @@ function GetPickUpInfo(pickup)
   }
 end
 
-
-
-
-
 function TTTStatistics:Log(table)
   if self.file == "" then
     self.file =  "session_" .. os.date("%Y%m%d%H%M", os.time()) .. ".txt"
@@ -734,13 +752,13 @@ function VectorToList(input)
   return input:ToTable()
 end
 
-
-function EpochTime()
-  local rawTimeResult = util.NiceFloat(SERVER_START_TIME + RealTime() * 1000)
-
-  local beg, index = string.find(rawTimeResult, "[.]")
-  local result =  string.sub(rawTimeResult, 0, index-1)
-  return result
+-- Returns Time as Seconds
+-- Delta from ServerStartTime
+function Now()
+  -- local rawTimeResult = util.NiceFloat(SERVER_START_TIME + RealTime() * 1000)
+  -- local beg, index = string.find(rawTimeResult, "[.]")
+  -- local result =  string.sub(rawTimeResult, 0, index-1)
+  return SysTime()
 end
 
 -- [ Request ]
@@ -769,7 +787,7 @@ end
 
 function TTTStatistics:Dump()
   if self.buffer == nil then
-    return 
+    return
   end
 
   if self.dump then
@@ -778,6 +796,7 @@ function TTTStatistics:Dump()
     end
 
     if TTT_STATS_WRITE_TO_DB:GetInt() > 0   then
+      print("TTT STATISTICS: CALLING DUMP\n")
       hook.Call(GMSTAT_HOOK, GMSTAT_HOOKID, TTT_STATS_HTTP_METHOD_POST, "/api/v1/round/dump", self.buffer, self.token)
     end
   end
@@ -786,7 +805,7 @@ end
 
 function AsyncRequest(method, url, body, token)
   local json = util.TableToJSON(body)
-  if string.len(TTT_STATS_HOST:GetString()) > 0 then
+  if string.len(TTT_STATS_HOST:GetString()) == 0 then
     return
   end
   
@@ -808,7 +827,7 @@ function AsyncRequest(method, url, body, token)
     ["url"] = url,
     ["headers"] = {
       ["Content-Type"] = "application/json", 
-      ['X-Token'] = token},
+      ['X-Token'] = "mytoken"},
     ["type"] = "application/json",
     ["body"] = json,
   }
